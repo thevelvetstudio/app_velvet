@@ -1,0 +1,65 @@
+import { Head, Link, router } from '@inertiajs/react';
+import { FiArrowRight, FiEye, FiSearch } from 'react-icons/fi';
+import { formatFriendlyDate } from '../../../../lib/date';
+import Layout from '../Layout';
+
+const typeLabels = {
+    MODEL: 'Modelo Webcam',
+    MONITOR: 'Monitor(a)',
+};
+
+const statusLabels = {
+    NEW: 'Nueva',
+    CONTACTED: 'Contactada',
+    PREQUALIFIED: 'Precalificada',
+    INTERVIEW: 'Entrevista',
+    EVALUATION: 'En evaluación',
+    ADMITTED: 'Admitida',
+};
+
+export default function Index({ leads, filters }) {
+    const search = (event) => router.get(
+        '/admin/leads',
+        { ...filters, search: event.target.value },
+        { preserveState: true, replace: true },
+    );
+
+    return <>
+        <Head title="Leads" />
+        <Layout>
+            <div>
+                <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
+                    <div>
+                        <p className="text-[10px] uppercase tracking-[.28em] text-[#d56bea]">Reclutamiento</p>
+                        <h1 className="mt-2 font-editorial text-4xl text-white">Solicitudes recibidas</h1>
+                        <p className="mt-2 text-sm text-[#969baa]">Aplicaciones enviadas desde el onboarding público.</p>
+                    </div>
+                    <label className="relative block w-full sm:max-w-sm">
+                        <FiSearch className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#777c8e]" size={16} />
+                        <input defaultValue={filters.search} onChange={search} placeholder="Buscar nombre, código, email…" className="velvet-input mt-0 pl-10" />
+                    </label>
+                </div>
+
+                <div className="mt-8 overflow-hidden rounded-xl border border-[#252936] bg-[#10121a] shadow-[0_18px_55px_rgba(0,0,0,.18)]">
+                    <div className="overflow-x-auto">
+                        <table className="w-full min-w-[900px] text-left text-sm">
+                            <thead className="border-b border-[#282c38] bg-[#141620] text-[10px] uppercase tracking-[.18em] text-[#8e93a5]">
+                                <tr><th className="px-5 py-4">Lead</th><th className="px-5 py-4">Tipo</th><th className="px-5 py-4">Ciudad</th><th className="px-5 py-4">Estado</th><th className="px-5 py-4">Fecha</th><th className="px-5 py-4 text-right">Acción</th></tr>
+                            </thead>
+                            <tbody className="divide-y divide-[#252936]">
+                                {leads.data.length ? leads.data.map((lead) => <tr key={lead.id} className="group transition hover:bg-[#171522]">
+                                    <td className="px-5 py-5"><Link className="font-medium text-white transition hover:text-[#e0a1ee]" href={`/admin/leads/${lead.id}`}>{lead.first_name} {lead.last_name}</Link><p className="mt-1 text-xs text-[#777d8f]">{lead.code} <span className="px-1 text-[#4e5361]">·</span> {lead.email}</p></td>
+                                    <td className="px-5 py-5 text-[#c4c6d1]">{typeLabels[lead.candidate_type] || lead.candidate_type}</td>
+                                    <td className="px-5 py-5 text-[#c4c6d1]">{lead.city}</td>
+                                    <td className="px-5 py-5"><span className="rounded-full border border-[#9142a7]/50 bg-[#3d164d] px-3 py-1 text-xs text-[#f0c1fa]">{statusLabels[lead.status] || lead.status}</span></td>
+                                    <td className="px-5 py-5 text-[#9297a7]">{formatFriendlyDate(lead.created_at)}</td>
+                                    <td className="px-5 py-5 text-right"><Link href={`/admin/leads/${lead.id}`} className="inline-flex items-center gap-2 rounded-lg border border-[#713080] bg-[#32133d] px-3 py-2 text-xs font-medium text-[#edb4f8] transition hover:border-[#b12dd5] hover:bg-[#55166e] hover:text-white"><FiEye size={14} />Ver aplicación<FiArrowRight size={14} className="transition group-hover:translate-x-0.5" /></Link></td>
+                                </tr>) : <tr><td colSpan="6" className="px-5 py-16 text-center text-[#777d8f]">No hay solicitudes todavía.</td></tr>}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </Layout>
+    </>;
+}

@@ -1,0 +1,9 @@
+import { Head, Link } from '@inertiajs/react';
+import BrandMark from '@/Components/BrandMark';
+
+export default function Landing() {
+    return <><Head title="The Velvet Studio" /><main className="min-h-screen bg-[#fbfafc]">
+        <header className="mx-auto flex max-w-7xl items-center justify-between px-6 py-8"><Link href="/"><BrandMark className="h-9 max-w-[155px]" /></Link><div className="flex items-center gap-6"><Link href="/login" className="text-sm text-gray-500 hover:text-[#883499]">Acceso interno</Link><Link href="/apply" className="text-sm font-medium text-[#883499]">Trabaja con nosotros ↗</Link></div></header>
+        <section className="mx-auto grid max-w-7xl gap-16 px-6 pb-24 pt-20 lg:grid-cols-[1.1fr_.9fr] lg:items-end lg:pt-32"><div><p className="mb-6 text-xs font-semibold uppercase tracking-[.32em] text-[#883499]">The Velvet Studio</p><h1 className="max-w-3xl text-6xl font-semibold leading-[.95] tracking-[-.06em] sm:text-8xl">Encuentra tu lugar en Velvet.</h1><p className="mt-8 max-w-xl text-lg leading-8 text-gray-600">Queremos conocerte. Construye tu próximo capítulo con un equipo que convierte talento en experiencias extraordinarias.</p><Link href="/apply" className="velvet-button mt-10">Comenzar aplicación</Link></div><div className="border-l border-gray-200 pl-8"><p className="text-sm uppercase tracking-[.24em] text-gray-500">Dos caminos. Una misma energía.</p><div className="mt-12 space-y-8"><div><p className="text-2xl font-medium">Modelo Webcam</p><p className="mt-2 text-gray-600">Construye tu perfil y comienza tu proceso con Velvet.</p></div><div className="border-t border-gray-200 pt-8"><p className="text-2xl font-medium">Monitor(a)</p><p className="mt-2 text-gray-600">Acompaña y desarrolla el talento Velvet.</p></div></div></div></section>
+    </main></>;
+}
