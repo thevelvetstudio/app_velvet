@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { format, isValid, parseISO, subYears } from 'date-fns';
+import { addYears, format, isValid, parseISO, subYears } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { CalendarDays } from 'lucide-react';
 import { DayPicker } from 'react-day-picker';
@@ -12,10 +12,12 @@ function dateFromValue(value) {
     return isValid(date) ? date : undefined;
 }
 
-export default function VelvetDatePicker({ label, value, onChange, error }) {
+export default function VelvetDatePicker({ label, value, onChange, error, minDate, maxDate, placeholder = 'dd/mm/aaaa', ariaLabel = 'Seleccionar fecha' }) {
     const [open, setOpen] = useState(false);
     const selected = dateFromValue(value);
-    const maxBirthDate = subYears(new Date(), 18);
+    const defaultMaxDate = subYears(new Date(), 18);
+    const effectiveMaxDate = maxDate || defaultMaxDate;
+    const effectiveMinDate = minDate;
 
     const selectDate = (date) => {
         if (!date) return;
@@ -28,8 +30,8 @@ export default function VelvetDatePicker({ label, value, onChange, error }) {
             {label}
             <Popover.Root open={open} onOpenChange={setOpen}>
                 <Popover.Trigger asChild>
-                    <button type="button" aria-label="Seleccionar fecha de nacimiento" className={`velvet-date-trigger ${selected ? 'text-[#f7f1fb]' : 'text-gray-500'} ${error ? 'border-red-400' : ''}`}>
-                        <span>{selected ? format(selected, 'dd/MM/yyyy') : 'dd/mm/aaaa'}</span>
+                    <button type="button" aria-label={ariaLabel} className={`velvet-date-trigger ${selected ? 'text-[#f7f1fb]' : 'text-gray-500'} ${error ? 'border-red-400' : ''}`}>
+                        <span>{selected ? format(selected, 'dd/MM/yyyy') : placeholder}</span>
                         <CalendarDays size={17} strokeWidth={1.8} className="text-gray-400" />
                     </button>
                 </Popover.Trigger>
@@ -40,11 +42,11 @@ export default function VelvetDatePicker({ label, value, onChange, error }) {
                             locale={es}
                             selected={selected}
                             onSelect={selectDate}
-                            defaultMonth={selected && selected <= maxBirthDate ? selected : maxBirthDate}
+                            defaultMonth={selected || effectiveMinDate || effectiveMaxDate}
                             captionLayout="dropdown"
-                            fromYear={1940}
-                            toYear={maxBirthDate.getFullYear()}
-                            disabled={{ after: maxBirthDate }}
+                            fromYear={effectiveMinDate?.getFullYear() || 1940}
+                            toYear={effectiveMaxDate?.getFullYear() || addYears(new Date(), 10).getFullYear()}
+                            disabled={{ ...(effectiveMinDate ? { before: effectiveMinDate } : {}), ...(effectiveMaxDate ? { after: effectiveMaxDate } : {}) }}
                             showOutsideDays
                             className="velvet-calendar"
                             classNames={{

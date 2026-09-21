@@ -5,8 +5,8 @@ import BrandMark from '@/Components/BrandMark';
 import { useAuthorization } from '@/lib/authorization';
 
 const sections = [
-    { label: 'Reclutamiento', items: [['Leads', '/admin/leads', FiUsers], ['Candidatos', '/admin/candidates', FiUserCheck], ['Entrevistas', '/admin/candidates?status=INTERVIEW', FiCalendar], ['Pipeline', '/admin/recruitment', FiGrid]] },
-    { label: 'Onboarding', items: [['Procesos', '/admin/recruitment', FiClipboard], ['Validaciones', '/admin/leads?status=NEW', FiFileText]] },
+    { label: 'Reclutamiento', items: [['Leads', '/admin/leads', FiUsers], ['Candidatos', '/admin/candidates', FiUserCheck], ['Entrevistas', '/admin/interviews', FiCalendar], ['Calendario', '/admin/calendar', FiCalendar], ['Pipeline', '/admin/recruitment', FiGrid]] },
+    { label: 'Onboarding', items: [['Procesos', '/admin/processes', FiClipboard], ['Validaciones', '/admin/validations', FiFileText]] },
     { label: 'Personas', items: [['Modelos', '/admin/candidates?type=MODEL', FiUsers], ['Monitores', '/admin/candidates?type=MONITOR', FiBriefcase]] },
     { label: 'Configuración', items: [['Workflows', '/admin/recruitment', FiSettings], ['Usuarios', '/admin/users', FiUsers], ['Roles y permisos', '/admin/access', FiSettings]] },
 ];
@@ -19,11 +19,13 @@ function isActive(label, url) {
     const [path, query = ''] = url.split('?');
     if (label === 'Modelos') return path === '/admin/candidates' && query.includes('type=MODEL');
     if (label === 'Monitores') return path === '/admin/candidates' && query.includes('type=MONITOR');
-    if (label === 'Entrevistas') return path === '/admin/candidates' && query.includes('status=INTERVIEW');
+    if (label === 'Entrevistas') return path === '/admin/interviews';
+    if (label === 'Calendario') return path === '/admin/calendar';
     if (label === 'Candidatos') return path === '/admin/candidates' && !query.includes('type=') && !query.includes('status=');
     if (label === 'Leads') return path === '/admin/leads' && !query.includes('status=NEW');
-    if (label === 'Validaciones') return path === '/admin/leads' && query.includes('status=NEW');
+    if (label === 'Validaciones') return path === '/admin/validations';
     if (label === 'Pipeline') return path === '/admin/recruitment' || path === '/admin';
+    if (label === 'Procesos') return path === '/admin/processes';
     if (label === 'Usuarios') return path === '/admin/users';
     if (label === 'Roles y permisos') return path === '/admin/access';
     return false;
@@ -33,6 +35,7 @@ const requiredPermissions = {
     Leads: 'leads.view',
     Candidatos: 'candidates.view',
     Entrevistas: 'interviews.view',
+    Calendario: 'calendar.view',
     Pipeline: 'dashboard.view',
     Procesos: 'onboarding.view',
     Validaciones: 'documents.verify',

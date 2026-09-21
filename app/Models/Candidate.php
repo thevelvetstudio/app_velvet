@@ -15,7 +15,18 @@ class Candidate extends Model
 
     protected function casts(): array
     {
-        return ['status' => CandidateStatus::class, 'candidate_type' => CandidateType::class, 'admitted_at' => 'datetime', 'activated_at' => 'datetime'];
+        return [
+            'status' => CandidateStatus::class,
+            'candidate_type' => CandidateType::class,
+            'prequalification_data' => 'array',
+            'admitted_at' => 'datetime',
+            'activated_at' => 'datetime',
+            'prequalification_sent_at' => 'datetime',
+            'prequalification_completed_at' => 'datetime',
+            'prequalification_expires_at' => 'datetime',
+            'identity_verification_data' => 'array',
+            'identity_verified_at' => 'datetime',
+        ];
     }
 
     public function lead()
@@ -31,5 +42,10 @@ class Candidate extends Model
     public function activities()
     {
         return $this->hasMany(CandidateActivity::class);
+    }
+
+    public function interviews()
+    {
+        return $this->hasMany(Interview::class);
     }
 }

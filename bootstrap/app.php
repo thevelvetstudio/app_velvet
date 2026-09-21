@@ -14,12 +14,19 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // Ngrok termina la conexión HTTPS y reenvía la petición al servidor local.
+        // Confiar en sus encabezados permite que Laravel genere URLs HTTPS.
+        $middleware->trustProxies(at: '*');
+
         $middleware->web(append: [
             HandleInertiaRequests::class,
             AddLinkHeadersForPreloadedAssets::class,
         ]);
 
         $middleware->alias(['permission' => EnsurePermission::class]);
+
+        // Didit calls this endpoint server-to-server, without a Laravel CSRF token.
+        $middleware->validateCsrfTokens(except: ['webhooks/didit']);
 
         //
     })

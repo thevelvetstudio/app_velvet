@@ -10,17 +10,19 @@ const parseDate = (value) => {
     return Number.isNaN(date.getTime()) ? null : date;
 };
 
+const bogota = { timeZone: 'America/Bogota' };
+
 export function formatFriendlyDate(value) {
     const date = parseDate(value);
-    return date ? new Intl.DateTimeFormat('es-CO', { day: 'numeric', month: 'long', year: 'numeric' }).format(date) : '—';
+    return date ? new Intl.DateTimeFormat('es-CO', { ...bogota, day: 'numeric', month: 'long', year: 'numeric' }).format(date) : '—';
 }
 
 export function formatFriendlyDateTime(value) {
     const date = parseDate(value);
-    return date ? new Intl.DateTimeFormat('es-CO', { day: 'numeric', month: 'long', year: 'numeric', hour: 'numeric', minute: '2-digit' }).format(date) : '—';
+    return date ? new Intl.DateTimeFormat('es-CO', { ...bogota, day: 'numeric', month: 'long', year: 'numeric', hour: 'numeric', minute: '2-digit' }).format(date) : '—';
 }
 
 export function formatCompactDate(value) {
     const date = parseDate(value);
-    return date ? new Intl.DateTimeFormat('es-CO', { day: 'numeric', month: 'short' }).format(date) : '—';
+    return date ? new Intl.DateTimeFormat('es-CO', { ...bogota, day: 'numeric', month: 'short' }).format(date) : '—';
 }

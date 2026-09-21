@@ -6,6 +6,7 @@ use App\Models\Candidate;
 use App\Models\CandidateActivity;
 use App\Models\Lead;
 use App\Models\LeadActivity;
+use App\Models\Interview;
 use Carbon\Carbon;
 use Carbon\CarbonPeriod;
 use Illuminate\Http\Request;
@@ -37,7 +38,7 @@ class RecruitmentDashboardService
                 ['key' => 'interviews', 'label' => 'Entrevistas', 'value' => $interviews, 'icon' => 'interviews', 'change' => $this->change($candidates, $from, $to, $previousFrom, $previousTo, fn ($query) => $query->where('status', 'INTERVIEW'))],
                 ['key' => 'evaluations', 'label' => 'En evaluación', 'value' => $evaluations, 'icon' => 'evaluation', 'change' => $this->change($candidates, $from, $to, $previousFrom, $previousTo, fn ($query) => $query->where('status', 'EVALUATION'))],
                 ['key' => 'onboarding', 'label' => 'Onboarding', 'value' => $onboarding, 'icon' => 'onboarding', 'change' => $this->change($candidates, $from, $to, $previousFrom, $previousTo, fn ($query) => $query->where('status', 'ONBOARDING'))],
-                ['key' => 'active', 'label' => 'Activos', 'value' => $active, 'icon' => 'active', 'change' => $this->change($candidates, $from, $to, $previousFrom, $previousTo, fn ($query) => $query->where('status', 'ACTIVE'))],
+                ['key' => 'active', 'label' => 'Activos', 'value' => $active, 'icon' => 'active', 'change' => $this->change($candidates, $from, $to, $previousFrom, $previousTo, fn ($query) => $query->where('status', 'ACTIVE'), 'activated_at')],
             ],
             'summary' => ['leads' => $totalLeads, 'candidates' => $totalCandidates],
             'pipeline' => $this->pipeline($leads, $candidates, $from, $to),
@@ -52,11 +53,11 @@ class RecruitmentDashboardService
                 'city' => $candidate->lead?->city,
                 'created_at' => $candidate->created_at?->toIso8601String(),
             ])->values(),
-            'upcomingInterviews' => $candidates->clone()->with('lead')->where('status', 'INTERVIEW')->latest('updated_at')->limit(5)->get()->map(fn (Candidate $candidate) => [
-                'id' => $candidate->id,
-                'name' => $candidate->lead?->full_name,
-                'type' => $candidate->candidate_type->value,
-                'date' => $candidate->updated_at?->toIso8601String(),
+            'upcomingInterviews' => Interview::query()->with('candidate.lead')->where('status', 'SCHEDULED')->whereNotNull('scheduled_at')->where('scheduled_at', '>=', now())->when($type !== 'ALL', fn ($query) => $query->whereHas('candidate', fn ($candidate) => $candidate->where('candidate_type', $type)))->orderBy('scheduled_at')->limit(5)->get()->map(fn (Interview $interview) => [
+                'id' => $interview->id,
+                'name' => $interview->candidate?->lead?->full_name,
+                'type' => $interview->candidate?->candidate_type?->value,
+                'date' => $interview->scheduled_at?->toIso8601String(),
             ])->values(),
             'activity' => $this->activity(),
             'attention' => $this->attention($leads, $candidates, $from, $to),
@@ -103,10 +104,10 @@ class RecruitmentDashboardService
         return $query->count();
     }
 
-    private function change($query, Carbon $from, Carbon $to, Carbon $previousFrom, Carbon $previousTo, ?callable $filter = null): int
+    private function change($query, Carbon $from, Carbon $to, Carbon $previousFrom, Carbon $previousTo, ?callable $filter = null, string $dateColumn = 'created_at'): int
     {
-        $current = $this->count($query, 'created_at', $from, $to, $filter);
-        $previous = $this->count($query, 'created_at', $previousFrom, $previousTo, $filter);
+        $current = $this->count($query, $dateColumn, $from, $to, $filter);
+        $previous = $this->count($query, $dateColumn, $previousFrom, $previousTo, $filter);
         if ($previous === 0) {
             return $current > 0 ? 100 : 0;
         }
@@ -131,13 +132,13 @@ class RecruitmentDashboardService
             $query = $stage['source'] === 'lead' ? $leads : $candidates;
             $status = $stage['key'] === 'QUALIFIED' ? 'QUALIFIED' : $stage['key'];
 
-            return ['key' => $stage['key'], 'label' => $stage['label'], 'count' => $this->count($query, 'created_at', $from, $to, fn ($builder) => $builder->where('status', $status))];
+            return ['key' => $stage['key'], 'label' => $stage['label'], 'count' => $this->currentCount($query, fn ($builder) => $builder->where('status', $status))];
         })->values()->all();
     }
 
     private function distribution($candidates, Carbon $from, Carbon $to): array
     {
-        return collect(['MODEL' => 'Modelos', 'MONITOR' => 'Monitores'])->map(fn ($label, $type) => ['type' => $type, 'label' => $label, 'count' => $this->count($candidates->clone()->where('candidate_type', $type), 'created_at', $from, $to)])->values()->all();
+        return collect(['MODEL' => 'Modelos', 'MONITOR' => 'Monitores'])->map(fn ($label, $type) => ['type' => $type, 'label' => $label, 'count' => $this->currentCount($candidates->clone()->where('candidate_type', $type))])->values()->all();
     }
 
     private function chart($leads, $candidates, Carbon $from, Carbon $to): array
@@ -147,6 +148,16 @@ class RecruitmentDashboardService
         $days = collect(CarbonPeriod::create($from->copy()->startOfDay(), '1 day', $to->copy()->startOfDay()))->map(fn ($date) => $date->toDateString());
 
         return $days->map(fn ($date) => ['date' => $date, 'label' => Carbon::parse($date)->locale('es')->translatedFormat('d MMM'), 'leads' => $leadDays->get($date, 0), 'candidates' => $candidateDays->get($date, 0)])->values()->all();
+    }
+
+    private function currentCount($query, ?callable $filter = null): int
+    {
+        $query = $query->clone();
+        if ($filter) {
+            $filter($query);
+        }
+
+        return $query->count();
     }
 
     private function activity(): array
@@ -160,9 +171,9 @@ class RecruitmentDashboardService
     private function attention($leads, $candidates, Carbon $from, Carbon $to): array
     {
         $items = [];
-        $newLeads = $this->count($leads, 'created_at', $from, $to, fn ($query) => $query->where('status', 'NEW'));
-        $evaluations = $this->count($candidates, 'created_at', $from, $to, fn ($query) => $query->where('status', 'EVALUATION'));
-        $interviews = $this->count($candidates, 'created_at', $from, $to, fn ($query) => $query->where('status', 'INTERVIEW'));
+        $newLeads = $this->currentCount($leads, fn ($query) => $query->where('status', 'NEW'));
+        $evaluations = $this->currentCount($candidates, fn ($query) => $query->where('status', 'EVALUATION'));
+        $interviews = $this->currentCount($candidates, fn ($query) => $query->where('status', 'INTERVIEW'));
         if ($newLeads) {
             $items[] = ['label' => 'Revisar nuevas solicitudes', 'count' => $newLeads, 'href' => '/admin/leads?status=NEW'];
         }

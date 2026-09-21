@@ -1,11 +1,12 @@
 import { Link } from '@inertiajs/react';
 import { FiActivity, FiArrowUpRight, FiBriefcase, FiCalendar, FiClock, FiFileText, FiShoppingBag, FiUserCheck, FiUsers } from 'react-icons/fi';
+import { candidateStatusLabels, candidateTypeLabels } from '../../../lib/recruitmentLabels';
 
 const icons = { leads: FiShoppingBag, candidates: FiUsers, interviews: FiCalendar, evaluation: FiClock, onboarding: FiFileText, active: FiUserCheck };
 
-export function MetricCard({ item }) {
+export function MetricCard({ item, periodLabel = 'Periodo seleccionado' }) {
     const Icon = icons[item.icon] || FiActivity;
-    return <article className="rounded-lg border border-[#242833] bg-[#10121a] p-4 transition hover:border-[#5a2c6a]"><div className="flex items-start justify-between"><div className="grid h-10 w-10 place-items-center rounded-lg bg-[#291533] text-[#d968f0]"><Icon size={20} strokeWidth={1.7} /></div><span className="text-[10px] text-[#707585]">Últimos 30 días</span></div><p className="mt-4 text-[13px] text-[#c9cad3]">{item.label}</p><div className="mt-1 flex items-end justify-between"><p className="font-editorial text-3xl text-white">{item.value}</p><span className={`text-xs ${item.change >= 0 ? 'text-[#55d99a]' : 'text-[#ff6b75]'}`}>{item.change >= 0 ? '↑' : '↓'} {Math.abs(item.change)}%</span></div></article>;
+    return <article className="rounded-lg border border-[#242833] bg-[#10121a] p-4 transition hover:border-[#5a2c6a]"><div className="flex items-start justify-between"><div className="grid h-10 w-10 place-items-center rounded-lg bg-[#291533] text-[#d968f0]"><Icon size={20} strokeWidth={1.7} /></div><span className="text-[10px] text-[#707585]">{periodLabel}</span></div><p className="mt-4 text-[13px] text-[#c9cad3]">{item.label}</p><div className="mt-1 flex items-end justify-between"><p className="font-editorial text-3xl text-white">{item.value}</p><span className={`text-xs ${item.change >= 0 ? 'text-[#55d99a]' : 'text-[#ff6b75]'}`}>{item.change >= 0 ? '↑' : '↓'} {Math.abs(item.change)}%</span></div></article>;
 }
 
 export function LineChart({ data }) {
@@ -34,7 +35,7 @@ export function Funnel({ pipeline }) {
 }
 
 export function CandidateTable({ candidates }) {
-    const labels = { MODEL: 'Modelo', MONITOR: 'Monitor', NEW: 'Nuevo', CONTACTED: 'Contactado', PREQUALIFIED: 'Precalificado', INTERVIEW: 'Entrevista', EVALUATION: 'En evaluación', ADMITTED: 'Admitido', ONBOARDING: 'Onboarding', ACTIVE: 'Activo' };
+    const labels = { ...candidateTypeLabels, ...candidateStatusLabels };
     return <div className="overflow-x-auto"><table className="w-full min-w-[620px] text-left text-xs"><thead className="border-b border-[#252936] text-[9px] uppercase tracking-wider text-[#858a99]"><tr><th className="px-4 py-3">Nombre</th><th className="px-3 py-3">Tipo</th><th className="px-3 py-3">Ciudad</th><th className="px-3 py-3">Código</th><th className="px-3 py-3">Estado</th></tr></thead><tbody className="divide-y divide-[#20232d]">{candidates.length ? candidates.map((candidate) => <tr key={candidate.id} className="transition hover:bg-[#171522]"><td className="px-4 py-3"><Link href={`/admin/candidates/${candidate.id}`} className="flex items-center gap-2.5 text-[#f3f0f7] hover:text-[#dc83ed]"><span className="grid h-7 w-7 place-items-center rounded-full bg-[#522064] text-[10px] font-semibold text-[#efc8f6]">{candidate.name?.split(' ').map((part) => part[0]).join('').slice(0, 2)}</span>{candidate.name}</Link></td><td className="px-3 py-3"><span className="rounded bg-[#32163e] px-2 py-1 text-[10px] text-[#dc91ec]">{labels[candidate.type] || candidate.type}</span></td><td className="px-3 py-3 text-[#abb0bd]">{candidate.city || '—'}</td><td className="px-3 py-3 font-mono text-[10px] text-[#8f94a3]">{candidate.code}</td><td className="px-3 py-3"><span className="rounded-full bg-[#182d3e] px-2.5 py-1 text-[10px] text-[#8ebce0]">{labels[candidate.status] || candidate.status}</span></td></tr>) : <tr><td colSpan="5" className="px-4 py-12 text-center text-[#777c8b]">No hay candidatos todavía.</td></tr>}</tbody></table></div>;
 }
 

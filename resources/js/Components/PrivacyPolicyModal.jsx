@@ -25,7 +25,7 @@ export default function PrivacyPolicyModal({ open, onOpenChange }) {
                         <section><h2 className="font-semibold text-[#e5a1f2]">6. Autorización</h2><p className="mt-2">Al marcar la casilla autorizas de forma previa, expresa e informada el tratamiento de tus datos para las finalidades descritas. La entrega de información es voluntaria; sin embargo, algunos datos son necesarios para estudiar y responder tu aplicación.</p></section>
                         <p className="border-t border-[#292936] pt-5 text-xs text-gray-500">Texto base para el producto. Antes de publicar, valida la identificación legal del responsable, el correo de privacidad, los tiempos de conservación y los canales formales con asesoría legal.</p>
                     </div>
-                    <div className="flex justify-end border-t border-[#292936] px-6 py-4 sm:px-8"><Dialog.Close asChild><button type="button" className="velvet-button">Entendido</button></Dialog.Close></div>
+                    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#292936] px-6 py-4 sm:px-8"><a href="/politica-de-privacidad" target="_blank" rel="noreferrer" className="text-xs text-[#e5a1f2] underline">Ver página completa</a><Dialog.Close asChild><button type="button" className="velvet-button">Entendido</button></Dialog.Close></div>
                 </Dialog.Content>
             </Dialog.Portal>
         </Dialog.Root>

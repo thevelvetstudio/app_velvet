@@ -4,6 +4,7 @@ import './bootstrap';
 import { createInertiaApp, router } from '@inertiajs/react';
 import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
 import { createRoot } from 'react-dom/client';
+import { Toaster, toast } from 'react-hot-toast';
 import { useEffect, useState } from 'react';
 
 const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
@@ -11,6 +12,9 @@ const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
 const isPublicPath = (pathname) => pathname === '/'
     || pathname === '/login'
     || pathname === '/apply'
+    || pathname === '/politica-de-privacidad'
+    || pathname === '/terminos-y-condiciones'
+    || pathname.startsWith('/prequalification/')
     || pathname.startsWith('/forgot-password')
     || pathname.startsWith('/reset-password')
     || pathname.startsWith('/verify-email')
@@ -99,6 +103,69 @@ function DashboardRouteSkeleton() {
     return <div className="dashboard-route-skeleton" aria-busy="true" aria-label="Cargando módulo"><div className="admin-page-content"><div className="flex flex-col justify-between gap-5 md:flex-row md:items-end"><div className="space-y-3">{block('h-3 w-64')}{block('h-10 w-80')}</div><div className="flex gap-3">{block('h-8 w-24')}{block('h-10 w-36')}</div></div><div className="mt-7 flex items-center justify-between border-b border-[#20232d] pb-5">{block('h-3 w-40')}{block('h-9 w-56')}</div><section className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">{Array.from({ length: 6 }).map((_, index) => <div key={index} className="rounded-lg border border-[#242833] bg-[#10121a] p-4">{block('h-9 w-9')}{block('mt-5 h-3 w-24')}{block('mt-2 h-8 w-16')}{block('mt-4 h-2 w-full')}</div>)}</section><section className="mt-5 grid gap-4 xl:grid-cols-[1.55fr_.85fr]"><div className="rounded-lg border border-[#242833] bg-[#10121a] p-5">{block('h-4 w-48')}{block('mt-3 h-3 w-72')}{block('mt-8 h-56 w-full')}</div><div className="rounded-lg border border-[#242833] bg-[#10121a] p-5">{block('h-4 w-40')}{block('mt-3 h-3 w-56')}{block('mx-auto mt-8 h-40 w-40 rounded-full')}</div></section></div></div>;
 }
 
+function GlobalCrudToasts() {
+    useEffect(() => {
+        const requestToastId = 'velvet-crud-request';
+        const isCrudMutation = (visit) => {
+            const method = String(visit?.method || 'get').toLowerCase();
+            const pathname = new URL(visit?.url || window.location.href, window.location.origin).pathname;
+
+            // Solo las operaciones de escritura del panel administrativo son CRUD.
+            // Login, logout, onboarding y navegación no deben mostrar estos avisos.
+            return method !== 'get' && pathname.startsWith('/admin/');
+        };
+        const firstError = (errors) => Object.values(errors || {}).flat().find(Boolean);
+        let mutationInFlight = false;
+
+        const onStart = (event) => {
+            if (isCrudMutation(event.detail?.visit)) {
+                mutationInFlight = true;
+                toast.loading('Procesando…', { id: requestToastId });
+            }
+        };
+        const onSuccess = (event) => {
+            if (!mutationInFlight) return;
+            const flash = event.detail?.page?.props?.flash || {};
+            mutationInFlight = false;
+            toast.success(flash.success || 'Cambios guardados correctamente.', { id: requestToastId });
+        };
+        const onError = (event) => {
+            if (!mutationInFlight) return;
+            const message = firstError(event.detail?.errors) || 'No se pudo completar la operación.';
+            mutationInFlight = false;
+            toast.error(message, { id: requestToastId });
+        };
+        const onException = () => {
+            if (!mutationInFlight) return;
+            mutationInFlight = false;
+            toast.error('Ocurrió un error inesperado. Inténtalo de nuevo.', { id: requestToastId });
+        };
+        const onFinish = (event) => {
+            if (mutationInFlight && (event.detail?.visit?.cancelled || event.detail?.visit?.interrupted)) {
+                mutationInFlight = false;
+                toast.dismiss(requestToastId);
+            }
+        };
+        const onInvalid = (event) => {
+            if (event.detail?.response?.status === 419) {
+                event.preventDefault();
+                window.location.reload();
+            }
+        };
+
+        const removeStart = router.on('start', onStart);
+        const removeSuccess = router.on('success', onSuccess);
+        const removeError = router.on('error', onError);
+        const removeException = router.on('exception', onException);
+        const removeFinish = router.on('finish', onFinish);
+        const removeInvalid = router.on('invalid', onInvalid);
+
+        return () => { removeStart(); removeSuccess(); removeError(); removeException(); removeFinish(); removeInvalid(); };
+    }, []);
+
+    return <Toaster position="top-center" reverseOrder={false} gutter={10} toastOptions={{ duration: 4200, className: 'velvet-toast', success: { className: 'velvet-toast velvet-toast--success' }, error: { className: 'velvet-toast velvet-toast--error' }, loading: { className: 'velvet-toast velvet-toast--loading' } }} />;
+}
+
 function CookieConsentBanner() {
     const [visible, setVisible] = useState(false);
     const [preferencesOpen, setPreferencesOpen] = useState(false);
@@ -162,7 +229,7 @@ createInertiaApp({
     setup({ el, App, props }) {
         const root = createRoot(el);
 
-        root.render(<><App {...props} /><PublicRouteOverlay /><DashboardRouteSkeleton /><CookieConsentBanner /><CookiePreferencesEntry /></>);
+        root.render(<><App {...props} /><GlobalCrudToasts /><PublicRouteOverlay /><DashboardRouteSkeleton /><CookieConsentBanner /><CookiePreferencesEntry /></>);
     },
     progress: {
         color: '#4B5563',

@@ -44,9 +44,18 @@ export default function Login({ status, canResetPassword }) {
     const submit = (event) => {
         event.preventDefault();
 
+        if (processing) return;
+
         post(route('login'), {
             onFinish: () => reset('password'),
         });
+    };
+
+    const submitOnEnter = (event) => {
+        if (event.key !== 'Enter' || event.nativeEvent.isComposing || processing) return;
+
+        event.preventDefault();
+        submit(event);
     };
 
     const fieldAnimation = (delay, hasError) => ({
@@ -65,7 +74,6 @@ export default function Login({ status, canResetPassword }) {
 
             <div className="velvet-login__content">
                 <motion.div {...reveal(0, reducedMotion)}>
-                    <p className="velvet-login__eyebrow">Espacio interno</p>
                     <h1 className="velvet-login__title">
                         Bienvenido
                         <br />
@@ -84,7 +92,7 @@ export default function Login({ status, canResetPassword }) {
                     </div>
                 )}
 
-                <form onSubmit={submit} className="velvet-login__form">
+                <form onSubmit={submit} onKeyDown={submitOnEnter} className="velvet-login__form">
                     <motion.div {...fieldAnimation(0.12, Boolean(errors.email))}>
                         <label htmlFor="email" className="velvet-login__label">Email</label>
                         <div className={`velvet-login__field ${errors.email ? 'is-error' : ''}`}>

@@ -31,6 +31,8 @@ class RolePermissionSeeder extends Seeder
             ['name' => 'Rechazar candidatos', 'slug' => 'candidates.reject', 'group' => 'Reclutamiento'],
             ['name' => 'Convertir candidatos', 'slug' => 'candidates.convert', 'group' => 'Reclutamiento'],
             ['name' => 'Ver entrevistas', 'slug' => 'interviews.view', 'group' => 'Reclutamiento'],
+            ['name' => 'Ver calendario', 'slug' => 'calendar.view', 'group' => 'Reclutamiento'],
+            ['name' => 'Gestionar calendario', 'slug' => 'calendar.manage', 'group' => 'Reclutamiento'],
             ['name' => 'Gestionar onboarding', 'slug' => 'onboarding.manage', 'group' => 'Onboarding'],
             ['name' => 'Ver onboarding', 'slug' => 'onboarding.view', 'group' => 'Onboarding'],
             ['name' => 'Ver documentos', 'slug' => 'documents.view', 'group' => 'Documentos'],
@@ -103,9 +105,9 @@ class RolePermissionSeeder extends Seeder
         ])->all();
 
         $all = array_keys($permissions);
-        $recruiting = ['dashboard.view', 'leads.view', 'leads.create', 'leads.manage', 'candidates.view', 'candidates.view_all', 'candidates.create', 'candidates.update', 'candidates.change_status', 'candidates.add_note', 'candidates.schedule_interview', 'candidates.request_documents', 'candidates.approve', 'candidates.reject', 'candidates.convert', 'interviews.view'];
-        $hr = ['dashboard.view', 'candidates.view', 'candidates.view_all', 'onboarding.view', 'onboarding.manage', 'documents.view', 'documents.request', 'documents.verify', 'contracts.view', 'contracts.create', 'contracts.update', 'contracts.approve', 'personal_data.view', 'personal_data.update', 'models.create_from_candidate'];
-        $manager = ['dashboard.view', 'models.view_team', 'models.assign_monitor', 'models.change_monitor', 'monitors.view_team', 'shifts.view_team', 'shifts.manage_team', 'goals.create', 'goals.update', 'goals.assign', 'metrics.view_team', 'incidents.view_team', 'incidents.manage', 'rooms.view', 'rooms.manage_team'];
+        $recruiting = ['dashboard.view', 'leads.view', 'leads.create', 'leads.manage', 'candidates.view', 'candidates.view_all', 'candidates.create', 'candidates.update', 'candidates.change_status', 'candidates.add_note', 'candidates.schedule_interview', 'candidates.request_documents', 'candidates.approve', 'candidates.reject', 'candidates.convert', 'interviews.view', 'documents.view', 'documents.verify', 'calendar.view', 'calendar.manage'];
+        $hr = ['dashboard.view', 'candidates.view', 'candidates.view_all', 'onboarding.view', 'onboarding.manage', 'documents.view', 'documents.request', 'documents.verify', 'contracts.view', 'contracts.create', 'contracts.update', 'contracts.approve', 'personal_data.view', 'personal_data.update', 'models.create_from_candidate', 'calendar.view'];
+        $manager = ['dashboard.view', 'models.view_team', 'models.assign_monitor', 'models.change_monitor', 'monitors.view_team', 'shifts.view_team', 'shifts.manage_team', 'goals.create', 'goals.update', 'goals.assign', 'metrics.view_team', 'incidents.view_team', 'incidents.manage', 'rooms.view', 'rooms.manage_team', 'calendar.view', 'calendar.manage', 'users.view', 'users.create', 'users.update', 'users.disable'];
         $monitor = ['dashboard.view', 'models.view_assigned', 'models.view_metrics', 'models.add_note', 'models.add_followup', 'models.view_goals', 'shifts.view_assigned', 'shifts.update_status', 'incidents.create', 'incidents.view_assigned', 'goals.view_assigned'];
         $model = ['profile.view_own', 'profile.update_own', 'documents.view_own', 'documents.upload_own', 'shifts.view_own', 'goals.view_own', 'metrics.view_own', 'training.view', 'requests.create', 'requests.view_own', 'payments.view_own'];
         $candidate = ['profile.view_own', 'profile.update_own', 'documents.view_own', 'documents.upload_own', 'personal_data.view', 'personal_data.update', 'requests.create', 'requests.view_own'];
