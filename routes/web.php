@@ -39,6 +39,7 @@ Route::middleware('auth')->group(function () {
             Route::get('/', [RecruitmentController::class, 'dashboard'])->name('dashboard');
             Route::get('/recruitment', [RecruitmentController::class, 'dashboard'])->name('recruitment');
         });
+        Route::get('/workflows', [RecruitmentController::class, 'workflows'])->middleware('permission:settings.manage')->name('workflows');
         Route::get('/processes', [RecruitmentController::class, 'processes'])->middleware('permission:onboarding.view')->name('processes');
         Route::middleware('permission:leads.view')->group(function () {
             Route::get('/leads', [RecruitmentController::class, 'leads'])->name('leads');

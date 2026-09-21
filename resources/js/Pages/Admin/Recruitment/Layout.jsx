@@ -8,7 +8,7 @@ const sections = [
     { label: 'Reclutamiento', items: [['Leads', '/admin/leads', FiUsers], ['Candidatos', '/admin/candidates', FiUserCheck], ['Entrevistas', '/admin/interviews', FiCalendar], ['Calendario', '/admin/calendar', FiCalendar], ['Pipeline', '/admin/recruitment', FiGrid]] },
     { label: 'Onboarding', items: [['Procesos', '/admin/processes', FiClipboard], ['Validaciones', '/admin/validations', FiFileText]] },
     { label: 'Personas', items: [['Modelos', '/admin/candidates?type=MODEL', FiUsers], ['Monitores', '/admin/candidates?type=MONITOR', FiBriefcase]] },
-    { label: 'Configuración', items: [['Workflows', '/admin/recruitment', FiSettings], ['Usuarios', '/admin/users', FiUsers], ['Roles y permisos', '/admin/access', FiSettings]] },
+    { label: 'Configuración', items: [['Workflows', '/admin/workflows', FiSettings], ['Usuarios', '/admin/users', FiUsers], ['Roles y permisos', '/admin/access', FiSettings]] },
 ];
 
 function Wordmark() {
@@ -28,6 +28,7 @@ function isActive(label, url) {
     if (label === 'Procesos') return path === '/admin/processes';
     if (label === 'Usuarios') return path === '/admin/users';
     if (label === 'Roles y permisos') return path === '/admin/access';
+    if (label === 'Workflows') return path === '/admin/workflows';
     return false;
 }
 

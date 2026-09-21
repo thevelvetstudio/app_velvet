@@ -8,6 +8,36 @@
     h1, h2, h3, .font-editorial { font-family: Georgia, 'Times New Roman', serif; font-weight: 400; }
 }
 
+.workflow-controls {
+    overflow: hidden;
+    border: 1px solid #493255 !important;
+    border-radius: .75rem !important;
+    background: rgba(17, 18, 28, .96) !important;
+    box-shadow: 0 12px 30px rgba(0, 0, 0, .32), 0 0 0 1px rgba(194, 59, 234, .08);
+}
+
+.workflow-controls button {
+    width: 2.35rem !important;
+    height: 2.35rem !important;
+    border-bottom: 1px solid #30283b !important;
+    background: #151522 !important;
+    color: #c8b5d0 !important;
+    transition: background-color .18s ease, color .18s ease, box-shadow .18s ease;
+}
+
+.workflow-controls button:last-child { border-bottom: 0 !important; }
+.workflow-controls button:hover,
+.workflow-controls button:focus-visible { background: #32163e !important; color: #f0a9ff !important; box-shadow: inset 0 0 0 1px #9d36b6; outline: none; }
+.workflow-controls button svg { fill: currentColor; stroke: currentColor; }
+
+.workflow-minimap {
+    overflow: hidden;
+    border: 1px solid #493255 !important;
+    border-radius: .75rem !important;
+    background: #11121c !important;
+    box-shadow: 0 12px 30px rgba(0, 0, 0, .3);
+}
+
 @keyframes velvet-overlay-pulse {
     0%, 100% { transform: scale(.96); opacity: .78; filter: drop-shadow(0 0 10px rgba(194, 59, 234, .28)); }
     50% { transform: scale(1.04); opacity: 1; filter: drop-shadow(0 0 30px rgba(194, 59, 234, .7)); }

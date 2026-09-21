@@ -69,7 +69,10 @@ class RecruitmentTest extends TestCase
         $user = User::factory()->create()->assignRole('recruiter');
         $this->actingAs($user)->post("/admin/leads/{$lead->id}/convert")->assertRedirect();
         $this->assertDatabaseHas('candidates', ['lead_id' => $lead->id, 'candidate_type' => 'MODEL']);
-        $this->actingAs($user)->post("/admin/leads/{$lead->id}/convert")->assertStatus(422);
+        // Repetir la petición es seguro si la primera navegación quedó
+        // interrumpida después de confirmar la conversión.
+        $this->actingAs($user)->post("/admin/leads/{$lead->id}/convert")->assertRedirect();
+        $this->assertDatabaseCount('candidates', 1);
     }
 
     public function test_authenticated_recruiter_can_load_the_real_dashboard_data(): void

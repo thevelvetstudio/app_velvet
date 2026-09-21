@@ -15,8 +15,21 @@ class ConvertLeadToCandidate
     {
         return DB::transaction(function () use ($lead) {
             $lead = Lead::query()->lockForUpdate()->findOrFail($lead->id);
-            if ($lead->candidate || $lead->status->value === 'CONVERTED') {
-                abort(422, 'Este lead ya fue convertido.');
+            // La petición puede repetirse si el navegador interrumpe la navegación
+            // después de confirmar la transacción. En ese caso devolvemos el
+            // candidato existente en vez de hacer fallar el reintento.
+            if ($lead->candidate) {
+                return $lead->candidate;
+            }
+
+            if ($lead->status->value === 'CONVERTED') {
+                $candidate = Candidate::query()->where('lead_id', $lead->id)->first();
+
+                if ($candidate) {
+                    return $candidate;
+                }
+
+                abort(409, 'El lead aparece convertido, pero no tiene un candidato asociado.');
             }
             $candidate = Candidate::create(['code' => 'VEL-CAN-'.str_pad((string) ((Candidate::max('id') ?? 0) + 1), 6, '0', STR_PAD_LEFT), 'lead_id' => $lead->id, 'candidate_type' => $lead->candidate_type, 'status' => CandidateStatus::NEW]);
             $lead->update(['status' => 'CONVERTED']);

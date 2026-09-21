@@ -408,6 +408,68 @@ class RecruitmentController extends Controller
         ]);
     }
 
+    public function workflows(): Response
+    {
+        $counts = Candidate::query()
+            ->select('status', DB::raw('count(*) as total'))
+            ->groupBy('status')
+            ->pluck('total', 'status')
+            ->map(fn ($total) => (int) $total)
+            ->all();
+
+        $status = fn (string $key, string $label, string $description, string $tone = 'purple') => [
+            'key' => $key,
+            'label' => $label,
+            'description' => $description,
+            'count' => $counts[$key] ?? 0,
+            'tone' => $tone,
+        ];
+
+        return Inertia::render('Admin/Recruitment/Workflows/Index', [
+            'flows' => [
+                [
+                    'id' => 'admission',
+                    'name' => 'Admisión de candidatos',
+                    'description' => 'Ruta principal desde la solicitud hasta la admisión y el inicio del onboarding.',
+                    'nodes' => [
+                        $status('NEW', 'Nuevo', 'Solicitud recibida'),
+                        $status('CONTACTED', 'Contactado', 'Primer contacto'),
+                        $status('PREQUALIFIED', 'Precalificado', 'Requisitos completos', 'blue'),
+                        $status('INTERVIEW', 'Entrevista', 'Cita y evaluación inicial', 'blue'),
+                        $status('EVALUATION', 'Evaluación', 'Revisión del equipo', 'blue'),
+                        $status('ADMITTED', 'Admitido', 'Ingreso aprobado', 'green'),
+                        $status('ONBOARDING', 'Onboarding', 'Documentación de ingreso', 'green'),
+                        $status('ACTIVE', 'Activo', 'Talento habilitado', 'green'),
+                    ],
+                    'branches' => [
+                        $status('WAITING', 'En espera', 'Pendiente de decisión', 'amber'),
+                        $status('DISCARDED', 'Descartado', 'No continúa el proceso', 'red'),
+                    ],
+                ],
+                [
+                    'id' => 'activation',
+                    'name' => 'Activación y permanencia',
+                    'description' => 'Seguimiento posterior a la admisión hasta la activación del talento.',
+                    'nodes' => [
+                        $status('ADMITTED', 'Admitido', 'Ingreso aprobado', 'green'),
+                        $status('ONBOARDING', 'Onboarding', 'Documentación de ingreso', 'green'),
+                        $status('CONTRACTING', 'Contratación', 'Formalización', 'blue'),
+                        $status('INDUCTION', 'Inducción', 'Preparación inicial', 'blue'),
+                        $status('READY_TO_ACTIVATE', 'Listo para activar', 'Revisión final', 'green'),
+                        $status('ACTIVE', 'Activo', 'Talento habilitado', 'green'),
+                    ],
+                    'branches' => [$status('WITHDRAWN', 'Retirado', 'Proceso cerrado', 'red')],
+                ],
+            ],
+            'summary' => [
+                'total' => Candidate::count(),
+                'active' => $counts['ACTIVE'] ?? 0,
+                'admitted' => $counts['ADMITTED'] ?? 0,
+                'inProgress' => collect($counts)->only(['CONTACTED', 'PREQUALIFIED', 'INTERVIEW', 'EVALUATION', 'ONBOARDING', 'CONTRACTING', 'INDUCTION', 'READY_TO_ACTIVATE'])->sum(),
+            ],
+        ]);
+    }
+
     public function processes(Request $request): Response
     {
         $query = Lead::query()->with(['candidate.interviews'])->latest('updated_at');
