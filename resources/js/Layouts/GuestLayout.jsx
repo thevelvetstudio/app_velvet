@@ -11,7 +11,7 @@ export default function GuestLayout({ children, variant = 'default' }) {
                     </Link>
 
                     <div className="velvet-login-brand-panel__image" aria-hidden="true">
-                        <img src="/onboarding/profile-model.png" alt="" />
+                        <img src="/onboarding/profile-model.webp" alt="" />
                         <div className="velvet-login-brand-panel__image-overlay" />
                     </div>
 

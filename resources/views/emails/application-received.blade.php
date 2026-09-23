@@ -1,6 +1,6 @@
 @php
     $logoUrl = asset('THEVELVETSTUDIO_BRANDBOOK-55.png');
-    $heroUrl = asset('onboarding/profile-model.png');
+    $heroUrl = asset('onboarding/modelo.webp');
     $typeLabel = $candidateType === 'MONITOR' ? 'Monitor(a)' : 'Modelo Webcam';
     $submittedLabel = $submittedAt?->format('d/m/Y');
 @endphp
