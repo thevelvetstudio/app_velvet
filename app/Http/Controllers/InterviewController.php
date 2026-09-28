@@ -9,6 +9,7 @@ use App\Models\CandidateActivity;
 use App\Models\Interview;
 use App\Models\InterviewSlot;
 use App\Services\InterviewInvitationService;
+use App\Services\RealtimePublisher;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -72,6 +73,12 @@ class InterviewController extends Controller
             $cursor->addDay();
         }
 
+        if ($created > 0) {
+            app(RealtimePublisher::class)->publish('interview.slots_generated', [
+                'notification' => ['title' => 'Horarios disponibles', 'description' => "Se generaron {$created} franjas de entrevista."],
+            ]);
+        }
+
         return back()->with('success', $created ? "Se generaron {$created} franjas de entrevista de una hora." : 'No había franjas nuevas para generar.');
     }
 
@@ -89,6 +96,8 @@ class InterviewController extends Controller
         if (! $interview) {
             return back()->withErrors(['interview' => 'Genera al menos una franja disponible antes de enviar la invitación.']);
         }
+        $activity = $candidate->activities()->latest('id')->first();
+        app(RealtimePublisher::class)->publishLead($candidate->fresh('lead'), 'interview.invited', ['interview_id' => $interview->id, 'activity' => $activity?->only(['id', 'description', 'created_at']), 'notification' => ['title' => 'Invitación de entrevista enviada', 'description' => "Se enviaron horarios a {$candidate->lead->full_name}."]]);
         return back()->with('success', 'Horarios de entrevista enviados al correo registrado.');
     }
 
@@ -97,6 +106,9 @@ class InterviewController extends Controller
         $validated = $request->validate(['status' => ['required', Rule::in(['SCHEDULED', 'COMPLETED', 'NO_SHOW', 'CANCELLED'])]]);
         $interview->update(['status' => $validated['status']]);
         if ($validated['status'] === 'CANCELLED' && $interview->slot) $interview->slot->update(['status' => 'AVAILABLE']);
+        $interview->load('candidate.lead');
+        $activity = CandidateActivity::create(['candidate_id' => $interview->candidate_id, 'user_id' => $request->user()->id, 'type' => 'interview_status_changed', 'description' => "Estado de entrevista actualizado a {$validated['status']}.", 'metadata' => ['interview_id' => $interview->id, 'status' => $validated['status']]]);
+        app(RealtimePublisher::class)->publishLead($interview->candidate->lead, 'interview.status_changed', ['interview_id' => $interview->id, 'activity' => $activity->only(['id', 'description', 'created_at']), 'notification' => ['title' => 'Entrevista actualizada', 'description' => "La entrevista de {$interview->candidate->lead->full_name} ahora está {$validated['status']}."]]);
         return back()->with('success', 'Estado de la entrevista actualizado.');
     }
 
@@ -149,7 +161,7 @@ class InterviewController extends Controller
                 abort_if($slot->status !== 'AVAILABLE' || $slot->starts_at->isPast(), 409, 'Este horario ya no está disponible. Elige otro.');
                 $slot->update(['status' => 'BOOKED']);
                 $interview->update(['interview_slot_id' => $slot->id, 'scheduled_at' => $slot->starts_at, 'status' => 'SCHEDULED', 'confirmed_at' => now(), 'invitation_token_hash' => null]);
-                CandidateActivity::create(['candidate_id' => $interview->candidate_id, 'type' => 'interview_scheduled', 'description' => 'La candidata agendó su entrevista.', 'metadata' => ['scheduled_at' => $slot->starts_at->toIso8601String()]]);
+                $activity = CandidateActivity::create(['candidate_id' => $interview->candidate_id, 'type' => 'interview_scheduled', 'description' => 'La candidata agendó su entrevista.', 'metadata' => ['scheduled_at' => $slot->starts_at->toIso8601String()]]);
                 return $interview->fresh(['candidate.lead', 'slot']);
             });
         } catch (\Throwable $exception) {
@@ -157,6 +169,8 @@ class InterviewController extends Controller
             throw $exception;
         }
         $whatsappUrl = $this->whatsappUrl($interview);
+        $activity = $interview->candidate->activities()->latest('id')->first();
+        app(RealtimePublisher::class)->publishLead($interview->candidate->lead, 'interview.scheduled', ['interview_id' => $interview->id, 'activity' => $activity?->only(['id', 'description', 'created_at']), 'notification' => ['title' => 'Entrevista agendada', 'description' => "{$interview->candidate->lead->full_name} agendó su entrevista."]]);
         try {
             Mail::to($interview->candidate->lead->email)->send(new InterviewScheduledMail($interview, $whatsappUrl));
         } catch (\Throwable $exception) {
@@ -181,3 +195,4 @@ class InterviewController extends Controller
     }
 
 }
+

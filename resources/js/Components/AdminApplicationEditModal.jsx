@@ -81,3 +81,4 @@ export default function AdminApplicationEditModal({ open, onClose, endpoint, per
         </form>
     </div>;
 }
+

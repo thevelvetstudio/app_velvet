@@ -20,7 +20,7 @@ class InterviewInvitationMail extends Mailable
 
     public function envelope(): Envelope
     {
-        return new Envelope(subject: 'Elige el horario de tu entrevista · The Velvet Studio');
+        return new Envelope(subject: 'Elige el horario de tu entrevista  ·  The Velvet Studio');
     }
 
     public function content(): Content
@@ -33,3 +33,4 @@ class InterviewInvitationMail extends Mailable
         ]);
     }
 }
+

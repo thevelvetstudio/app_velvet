@@ -20,7 +20,7 @@ class PrequalificationFormMail extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'Completa tus requisitos iniciales · The Velvet Studio',
+            subject: 'Completa tus requisitos iniciales  ·  The Velvet Studio',
         );
     }
 
@@ -36,3 +36,4 @@ class PrequalificationFormMail extends Mailable
         );
     }
 }
+

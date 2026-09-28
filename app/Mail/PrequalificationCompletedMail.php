@@ -20,7 +20,7 @@ class PrequalificationCompletedMail extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'Tu proceso avanzó · The Velvet Studio',
+            subject: 'Tu proceso avanzó  ·  The Velvet Studio',
         );
     }
 
@@ -35,3 +35,4 @@ class PrequalificationCompletedMail extends Mailable
         );
     }
 }
+

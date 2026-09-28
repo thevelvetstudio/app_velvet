@@ -159,3 +159,4 @@ export default function Prequalification({ candidate, actionUrl, identitySession
         </main>
     </>;
 }
+

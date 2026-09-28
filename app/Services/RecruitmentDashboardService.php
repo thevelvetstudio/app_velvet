@@ -53,10 +53,15 @@ class RecruitmentDashboardService
                 'city' => $candidate->lead?->city,
                 'created_at' => $candidate->created_at?->toIso8601String(),
             ])->values(),
-            'upcomingInterviews' => Interview::query()->with('candidate.lead')->where('status', 'SCHEDULED')->whereNotNull('scheduled_at')->where('scheduled_at', '>=', now())->when($type !== 'ALL', fn ($query) => $query->whereHas('candidate', fn ($candidate) => $candidate->where('candidate_type', $type)))->orderBy('scheduled_at')->limit(5)->get()->map(fn (Interview $interview) => [
+            'upcomingInterviews' => Interview::query()->with('candidate.lead')->whereIn('status', ['INVITED', 'SCHEDULED'])->where(function ($query) {
+                $query->where('status', 'INVITED')->orWhere(function ($scheduled) {
+                    $scheduled->where('status', 'SCHEDULED')->whereNotNull('scheduled_at')->where('scheduled_at', '>=', now());
+                });
+            })->when($type !== 'ALL', fn ($query) => $query->whereHas('candidate', fn ($candidate) => $candidate->where('candidate_type', $type)))->orderByRaw('scheduled_at IS NULL')->orderBy('scheduled_at')->limit(5)->get()->map(fn (Interview $interview) => [
                 'id' => $interview->id,
                 'name' => $interview->candidate?->lead?->full_name,
                 'type' => $interview->candidate?->candidate_type?->value,
+                'status' => $interview->status,
                 'date' => $interview->scheduled_at?->toIso8601String(),
             ])->values(),
             'activity' => $this->activity(),
@@ -187,3 +192,4 @@ class RecruitmentDashboardService
         return $items;
     }
 }
+

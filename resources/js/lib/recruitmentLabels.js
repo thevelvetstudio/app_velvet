@@ -1,4 +1,4 @@
-export const candidateTypeLabels = {
+﻿export const candidateTypeLabels = {
     MODEL: 'Modelo Webcam',
     MONITOR: 'Monitor(a)',
 };
@@ -28,3 +28,4 @@ export const candidateStatusLabels = {
     ACTIVE: 'Activo',
     WITHDRAWN: 'Retirado',
 };
+

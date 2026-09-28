@@ -1,8 +1,19 @@
-import { Link, usePage } from '@inertiajs/react';
+import { Link, router, usePage } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
 import { FiBell, FiBriefcase, FiCalendar, FiChevronDown, FiClipboard, FiFileText, FiGrid, FiLogOut, FiMenu, FiSearch, FiSettings, FiSun, FiUser, FiUserCheck, FiUsers, FiX } from 'react-icons/fi';
 import BrandMark from '@/Components/BrandMark';
 import { useAuthorization } from '@/lib/authorization';
+import toast from 'react-hot-toast';
+import { subscribeToRealtime } from '@/lib/ably';
+import { formatFriendlyDateTime, formatRelativeTime } from '@/lib/date';
+
+function notificationHref(item) {
+    const data = item?.data || {};
+    if (data.interview_id) return '/admin/interviews';
+    if (data.candidate_id) return `/admin/candidates/${data.candidate_id}`;
+    if (data.lead_id) return `/admin/leads/${data.lead_id}`;
+    return '/admin/notifications/history';
+}
 
 const sections = [
     { label: 'Reclutamiento', items: [['Leads', '/admin/leads', FiUsers], ['Candidatos', '/admin/candidates', FiUserCheck], ['Entrevistas', '/admin/interviews', FiCalendar], ['Calendario', '/admin/calendar', FiCalendar], ['Pipeline', '/admin/recruitment', FiGrid]] },
@@ -64,12 +75,22 @@ function DashboardSkeleton() {
 }
 
 export default function Layout({ children }) {
+    const page = usePage();
     const [open, setOpen] = useState(false);
     const [profileOpen, setProfileOpen] = useState(false);
+    const [notifications, setNotifications] = useState(() => (page?.props?.realtime?.notifications || []).filter((item) => !item.read_at).length);
+    const [notificationItems, setNotificationItems] = useState(() => page?.props?.realtime?.notifications || []);
+    const [notificationSearch, setNotificationSearch] = useState('');
+    const [relativeNow, setRelativeNow] = useState(Date.now());
+    const [counters, setCounters] = useState(() => page?.props?.realtime?.counters || {});
     const menuRef = useRef(null);
-    const page = usePage();
     const user = page.props.auth?.user;
     const { can } = useAuthorization();
+
+    useEffect(() => {
+        const interval = window.setInterval(() => setRelativeNow(Date.now()), 15000);
+        return () => window.clearInterval(interval);
+    }, []);
 
     useEffect(() => {
         const closeMenu = (event) => { if (menuRef.current && !menuRef.current.contains(event.target)) setProfileOpen(false); };
@@ -77,5 +98,192 @@ export default function Layout({ children }) {
         return () => document.removeEventListener('mousedown', closeMenu);
     }, []);
 
+    useEffect(() => setCounters(page.props.realtime?.counters || {}), [page.props.realtime]);
+    useEffect(() => {
+        const items = page.props.realtime?.notifications || [];
+        setNotificationItems(items);
+        setNotifications(items.filter((item) => !item.read_at).length);
+    }, [page.props.realtime?.notifications]);
+
+    useEffect(() => subscribeToRealtime((data) => {
+        if (data?.counters) setCounters(data.counters);
+        const notification = data?.notification;
+        if (!notification) return;
+        setNotifications((current) => Math.min(current + 1, 99));
+        setNotificationItems((current) => [{
+            id: `${Date.now()}-${data.lead_id || data.candidate_id || 'system'}`,
+            title: notification.title || 'Nueva notificación',
+            description: notification.description || '',
+            data,
+            created_at: new Date().toISOString(),
+        }, ...current].slice(0, 25));
+        fetch('/admin/notifications', { headers: { Accept: 'application/json' } })
+            .then((response) => response.ok ? response.json() : null)
+            .then((result) => {
+                if (!result?.notifications) return;
+                setNotificationItems(result.notifications);
+                setNotifications(result.notifications.filter((item) => !item.read_at).length);
+            })
+            .catch(() => {});
+        toast(notification.description || notification.title, { icon: '⚡', duration: 5000 });
+    }), []);
+
+    useEffect(() => {
+        const bell = document.querySelector('header button.relative');
+        if (!bell) return;
+        const staticBadge = bell.querySelector('span:not([data-realtime-badge])');
+        if (staticBadge) staticBadge.hidden = true;
+        let badge = bell.querySelector('[data-realtime-badge]');
+        if (!badge) {
+            badge = document.createElement('span');
+            badge.dataset.realtimeBadge = 'true';
+            badge.className = 'absolute -right-2 -top-2 grid h-4 min-w-4 place-items-center rounded-full bg-[#a92ad8] px-1 text-[9px] text-white';
+            bell.appendChild(badge);
+        }
+        badge.textContent = notifications > 99 ? '99+' : String(notifications);
+        badge.hidden = notifications === 0;
+        bell.setAttribute('aria-label', notifications ? `${notifications} notificaciones nuevas` : 'Sin notificaciones nuevas');
+        const clearNotifications = () => {
+            setNotifications(0);
+            fetch('/admin/notifications/read-all', {
+                method: 'POST',
+                headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '', Accept: 'application/json' },
+            }).catch(() => {});
+        };
+        bell.addEventListener('click', clearNotifications);
+        return () => bell.removeEventListener('click', clearNotifications);
+    }, [notifications]);
+
+    useEffect(() => {
+        const bell = document.querySelector('header button.relative');
+        if (!bell || document.querySelector('[data-notification-panel]')) return;
+        const panel = document.createElement('section');
+        panel.dataset.notificationPanel = 'true';
+        panel.hidden = true;
+        panel.className = 'fixed right-5 top-[58px] z-[70] w-[360px] overflow-hidden rounded-xl border border-[#34303d] bg-[#15121d] shadow-[0_18px_45px_rgba(0,0,0,.55)]';
+        document.body.appendChild(panel);
+        const toggle = (event) => { event.stopPropagation(); panel.hidden = !panel.hidden; };
+        const close = (event) => { if (!panel.contains(event.target) && event.target !== bell) panel.hidden = true; };
+        bell.addEventListener('click', toggle);
+        document.addEventListener('mousedown', close);
+        return () => {
+            bell.removeEventListener('click', toggle);
+            document.removeEventListener('mousedown', close);
+            panel.remove();
+        };
+    }, []);
+
+    useEffect(() => {
+        const panel = document.querySelector('[data-notification-panel]');
+        if (!panel) return;
+        panel.replaceChildren();
+        const header = document.createElement('div');
+        header.className = 'flex items-center justify-between border-b border-[#292936] px-4 py-3';
+        const title = document.createElement('p');
+        title.className = 'text-sm font-semibold text-white';
+        title.textContent = 'Notificaciones';
+        const count = document.createElement('span');
+        count.className = 'rounded-full bg-[#3b2046] px-2 py-0.5 text-[10px] text-[#e6a0f2]';
+        count.textContent = notificationItems.length ? String(notificationItems.length) : '0';
+        header.append(title, count);
+        panel.appendChild(header);
+        const search = document.createElement('input');
+        search.type = 'search';
+        search.value = notificationSearch;
+        search.placeholder = 'Buscar notificaciones...';
+        search.className = 'mx-4 mt-3 w-[calc(100%-2rem)] rounded-lg border border-[#343044] bg-[#0f0e16] px-3 py-2 text-xs text-white outline-none placeholder:text-[#777d8f] focus:border-[#a92ad8]';
+        search.addEventListener('input', (event) => setNotificationSearch(event.target.value));
+        panel.appendChild(search);
+
+        const query = notificationSearch.trim().toLowerCase();
+        const filteredItems = notificationItems.filter((item) => {
+            const data = item.data || {};
+            return [item.title, item.description, item.channel, data.code, data.lead_id, data.candidate_id]
+                .filter(Boolean)
+                .join(' ')
+                .toLowerCase()
+                .includes(query);
+        });
+
+        if (!filteredItems.length) {
+            const empty = document.createElement('p');
+            empty.className = 'px-4 py-8 text-center text-xs text-[#858a99]';
+            empty.textContent = notificationItems.length ? 'No hay resultados para esa búsqueda.' : 'No hay notificaciones nuevas.';
+            panel.appendChild(empty);
+            return;
+        }
+        const list = document.createElement('div');
+        list.className = 'notification-dropdown-list max-h-[360px] overflow-y-auto';
+        filteredItems.forEach((item) => {
+            const row = document.createElement('article');
+            row.className = 'flex items-center gap-3 border-b border-[#292936] px-4 py-3 last:border-b-0';
+            const content = document.createElement('div');
+            content.className = 'min-w-0 flex-1';
+            const itemTitle = document.createElement('p');
+            itemTitle.className = 'text-xs font-medium text-white';
+            itemTitle.textContent = item.title;
+            const description = document.createElement('p');
+            description.className = 'mt-1 text-[11px] leading-4 text-[#a5a7b4]';
+            description.textContent = item.description;
+            const reference = item.data?.code || (item.data?.lead_id ? `Lead #${item.data.lead_id}` : null);
+            if (reference) {
+                const referenceText = document.createElement('p');
+                referenceText.className = 'mt-1 text-[10px] font-medium text-[#d56bea]';
+                referenceText.textContent = reference;
+                content.append(itemTitle, description, referenceText);
+            } else {
+                content.append(itemTitle, description);
+            }
+            const timestamp = document.createElement('p');
+            timestamp.className = 'mt-1 text-[10px] text-[#777d8f]';
+            timestamp.textContent = formatRelativeTime(item.created_at, relativeNow);
+            timestamp.title = formatFriendlyDateTime(item.created_at);
+            content.appendChild(timestamp);
+            const action = document.createElement('a');
+            action.href = notificationHref(item);
+            action.className = 'grid h-7 w-7 shrink-0 place-items-center rounded-md border border-[#713080] text-sm text-[#e5a1f2] transition hover:bg-[#713080] hover:text-white';
+            action.title = 'Abrir módulo relacionado';
+            action.setAttribute('aria-label', 'Abrir módulo relacionado');
+            action.textContent = '↗';
+            action.addEventListener('click', (event) => {
+                event.preventDefault();
+                panel.hidden = true;
+                router.visit(action.href);
+            });
+            row.append(content, action);
+            list.appendChild(row);
+        });
+        const history = document.createElement('a');
+        history.href = '/admin/notifications/history';
+        history.className = 'block border-t border-[#292936] px-4 py-3 text-center text-[11px] font-medium text-[#d56bea] hover:bg-[#24152d]';
+        history.textContent = 'Ver historial de notificaciones';
+        history.addEventListener('click', (event) => {
+            event.preventDefault();
+            panel.hidden = true;
+            router.visit(history.href);
+        });
+        panel.appendChild(history);
+        panel.insertBefore(list, history);
+        panel.querySelector('input')?.focus();
+    }, [notificationItems, notificationSearch, relativeNow]);
+
+    useEffect(() => {
+        const items = { '/admin/leads': counters.leads, '/admin/candidates': counters.candidates, '/admin/interviews': counters.interviews };
+        Object.entries(items).forEach(([href, count]) => {
+            const link = document.querySelector(`aside a[href^="${href}"]`);
+            if (!link) return;
+            let badge = link.querySelector('[data-sidebar-counter]');
+            if (!badge) {
+                badge = document.createElement('span');
+                badge.dataset.sidebarCounter = 'true';
+                badge.className = 'ml-auto min-w-4 rounded-full bg-[#a92ad8] px-1.5 py-0.5 text-center text-[9px] font-semibold text-white';
+                link.appendChild(badge);
+            }
+            badge.textContent = count > 99 ? '99+' : String(count || 0);
+            badge.hidden = !count;
+        });
+    }, [counters]);
+
     return <div className="min-h-screen bg-[#090a10] text-[#f7f1fb]"><div className={`fixed inset-0 z-40 bg-black/70 transition lg:hidden ${open ? 'visible opacity-100' : 'invisible opacity-0'}`} onClick={() => setOpen(false)} /><div className={`fixed inset-y-0 left-0 z-50 transition-transform duration-300 lg:translate-x-0 ${open ? 'translate-x-0' : '-translate-x-full'}`}><div className="absolute right-3 top-3 lg:hidden"><button type="button" onClick={() => setOpen(false)} className="rounded-lg p-2 text-gray-400 hover:bg-white/10 hover:text-white"><FiX /></button></div><Sidebar onClose={() => setOpen(false)} url={page.url} user={user} can={can} /></div><div className="lg:pl-[224px]"><header className="sticky top-0 z-30 flex h-[66px] items-center justify-between border-b border-[#1f222d] bg-[#090a10]/95 px-5 backdrop-blur-xl lg:px-6"><div className="flex items-center gap-4"><button type="button" onClick={() => setOpen(true)} className="rounded-lg p-2 text-gray-300 hover:bg-white/10 lg:hidden"><FiMenu /></button><div className="hidden h-10 w-[480px] items-center gap-3 rounded-lg border border-[#262a36] bg-[#10121a] px-3 text-sm text-[#868b9b] md:flex"><FiSearch size={17} /><span>Buscar candidatos, leads, entrevistas…</span><kbd className="ml-auto rounded border border-[#2f3340] px-2 py-0.5 text-[10px] text-[#adb0bd]">⌘ K</kbd></div></div><div className="flex items-center gap-4"><button type="button" className="hidden text-[#c8cad3] hover:text-white sm:block"><FiSun size={18} /></button><button type="button" className="relative text-[#c8cad3] hover:text-white"><FiBell size={19} /><span className="absolute -right-2 -top-2 grid h-4 min-w-4 place-items-center rounded-full bg-[#a92ad8] px-1 text-[9px] text-white">3</span></button><ProfileMenu user={user} open={profileOpen} onToggle={() => setProfileOpen((value) => !value)} menuRef={menuRef} /></div></header><main><div className="admin-page-content">{children}</div></main></div></div>;
 }
+

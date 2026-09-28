@@ -47,4 +47,15 @@ return [
         'whatsapp_number' => env('VELVET_WHATSAPP_NUMBER'),
     ],
 
+    'ably' => [
+        'api_key' => env('ABLY_API_KEY'),
+        'channel' => env('ABLY_CHANNEL', 'admin-leads'),
+        'notification_channel' => env('ABLY_NOTIFICATION_CHANNEL', env('ABLY_CHANNEL', 'admin-leads')),
+        'channels' => [
+            'leads' => env('ABLY_LEADS_CHANNEL', 'admin-leads'),
+            'interviews' => env('ABLY_INTERVIEWS_CHANNEL', 'admin-interviews'),
+            'onboarding' => env('ABLY_ONBOARDING_CHANNEL', 'admin-onboarding'),
+        ],
+    ],
+
 ];

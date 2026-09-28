@@ -1,4 +1,4 @@
-import { Link } from '@inertiajs/react';
+﻿import { Link } from '@inertiajs/react';
 import BrandMark from '@/Components/BrandMark';
 
 export default function GuestLayout({ children, variant = 'default' }) {
@@ -33,7 +33,7 @@ export default function GuestLayout({ children, variant = 'default' }) {
                     </div>
 
                     <p className="velvet-login-brand-panel__footer">
-                        VELVET OS · 2026
+                        VELVET OS  ·  2026
                         <span>REAL PEOPLE. BIGGER STORIES.</span>
                     </p>
                 </aside>
@@ -48,7 +48,7 @@ export default function GuestLayout({ children, variant = 'default' }) {
             <div className="hidden bg-[#17131a] p-12 text-white lg:flex lg:flex-col lg:justify-between">
                 <Link href="/"><BrandMark className="h-11 max-w-[170px]" /></Link>
                 <div><p className="text-xs uppercase tracking-[.3em] text-[#c68bd1]">The Velvet Studio</p><p className="mt-6 max-w-md text-5xl font-semibold leading-none tracking-[-.05em]">El talento encuentra su lugar.</p><p className="mt-6 max-w-sm leading-7 text-white/60">Accede al espacio interno para gestionar procesos, personas y oportunidades.</p></div>
-                <p className="text-xs uppercase tracking-[.25em] text-white/40">Velvet Onboarding · 2026</p>
+                <p className="text-xs uppercase tracking-[.25em] text-white/40">Velvet Onboarding  ·  2026</p>
             </div>
             <div className="flex min-h-screen flex-col bg-[#090a10] px-6 py-8 sm:px-12 lg:px-24">
                 <div className="flex justify-between lg:justify-end"><Link href="/" className="lg:hidden"><BrandMark className="h-9 max-w-[145px]" /></Link><Link href="/" className="text-sm text-gray-500 hover:text-[#883499]">Volver al sitio</Link></div>
@@ -57,3 +57,4 @@ export default function GuestLayout({ children, variant = 'default' }) {
         </div>
     );
 }
+
