@@ -59,9 +59,17 @@ class RealtimePublisher
 
     public function counters(): array
     {
+        // Leads y candidatos comparten el contador de pendientes de gestión.
+        // Un lead convertido no se duplica: pasa a contarse como candidato
+        // hasta que entra a entrevista o a una etapa posterior.
+        $pendingRecruitment = Lead::whereIn('status', ['NEW', 'CONTACTED', 'QUALIFIED', 'UNRESPONSIVE'])
+            ->whereDoesntHave('candidate')
+            ->count()
+            + Candidate::whereIn('status', ['NEW', 'CONTACTED', 'PREQUALIFIED'])->count();
+
         return [
-            'leads' => Lead::where('status', 'NEW')->count(),
-            'candidates' => Candidate::whereIn('status', ['NEW', 'CONTACTED'])->count(),
+            'leads' => $pendingRecruitment,
+            'candidates' => $pendingRecruitment,
             'interviews' => Interview::whereIn('status', ['INVITED', 'SCHEDULED'])->count(),
         ];
     }
