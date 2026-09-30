@@ -58,7 +58,7 @@ class CalendarController extends Controller
             ->map(fn (Interview $interview) => [
                 'id' => 'invitation-'.$interview->id,
                 'source' => 'deadline',
-                'title' => 'Vence invitación · '.$interview->candidate->lead->full_name,
+                'title' => 'Vence invitación  ·  '.$interview->candidate->lead->full_name,
                 'description' => 'La candidata aún debe elegir un horario de entrevista.',
                 'type' => 'DEADLINE',
                 'status' => 'OPEN',
@@ -77,7 +77,7 @@ class CalendarController extends Controller
             ->map(fn (Candidate $candidate) => [
                 'id' => 'prequalification-'.$candidate->id,
                 'source' => 'deadline',
-                'title' => 'Vence precalificación · '.$candidate->lead->full_name,
+                'title' => 'Vence precalificación  ·  '.$candidate->lead->full_name,
                 'description' => 'El enlace para completar los requisitos iniciales está próximo a vencer.',
                 'type' => 'DEADLINE',
                 'status' => 'OPEN',
@@ -215,7 +215,7 @@ class CalendarController extends Controller
         return [
             'id' => 'interview-'.$interview->id,
             'source' => 'interview',
-            'title' => 'Entrevista · '.$interview->candidate->lead->full_name,
+            'title' => 'Entrevista  ·  '.$interview->candidate->lead->full_name,
             'description' => 'Entrevista de selección. Código '.$interview->candidate->code.'.',
             'type' => 'INTERVIEW',
             'status' => 'SCHEDULED',
@@ -226,3 +226,4 @@ class CalendarController extends Controller
         ];
     }
 }
+

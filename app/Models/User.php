@@ -52,6 +52,11 @@ class User extends Authenticatable
         return $this->belongsToMany(Role::class, 'user_role');
     }
 
+    public function notifications()
+    {
+        return $this->hasMany(Notification::class);
+    }
+
     public function hasRole(string|Role|array $roles): bool
     {
         $slugs = collect(is_array($roles) ? $roles : [$roles])->map(fn ($role) => $role instanceof Role ? $role->slug : $role);

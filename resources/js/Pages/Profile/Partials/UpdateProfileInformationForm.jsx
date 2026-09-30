@@ -21,3 +21,4 @@ export default function UpdateProfileInformation({ mustVerifyEmail, status }) {
         </form>
     </div>;
 }
+

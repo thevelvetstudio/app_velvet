@@ -40,3 +40,5 @@ export function CandidateTable({ candidates }) {
 }
 
 export function PanelTitle({ eyebrow, title, href }) { return <div className="flex items-center justify-between"><div><p className="text-[10px] font-semibold uppercase tracking-[.22em] text-[#d36ee8]">{eyebrow}</p><h2 className="mt-1 font-editorial text-xl text-white">{title}</h2></div>{href && <Link href={href} className="flex items-center gap-1 text-xs text-[#d98aec] hover:text-white">Ver todos <FiArrowUpRight size={14} /></Link>}</div>; }
+
+

@@ -4,6 +4,7 @@ namespace App\Http\Requests;
 
 use App\Models\Lead;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreLeadRequest extends FormRequest
 {
@@ -16,10 +17,11 @@ class StoreLeadRequest extends FormRequest
     {
         return [
             'candidate_type' => ['required', 'in:MODEL,MONITOR'], 'first_name' => ['required', 'string', 'max:100'],
-            'last_name' => ['required', 'string', 'max:100'], 'sex' => ['required', 'in:WOMAN,MAN,TRANS_WOMAN,TRANS_MAN,NON_BINARY,GENDER_FLUID,AGENDER,SELF_DESCRIBE,PREFER_NOT_TO_SAY'], 'phone' => ['required', 'string', 'max:40'],
-            'email' => ['required', 'email', 'max:190'], 'city' => ['required', 'string', 'max:120'],
-            'birth_date' => ['nullable', 'required_if:candidate_type,MODEL', 'date', 'before_or_equal:'.now()->subYears(18)->toDateString()], 'experience' => ['nullable', 'string', 'max:5000'],
-            'availability' => ['required', 'string', 'max:100'], 'work_mode' => array_merge(['required', 'string', 'max:100'], $this->input('candidate_type') === 'MONITOR' ? ['in:En estudio'] : []),
+            'last_name' => ['required', 'string', 'max:100'], 'sex' => ['required', 'in:WOMAN,MAN'], 'phone' => ['required', 'string', 'max:40'],
+            'email' => ['required', 'email', 'max:190'], 'country' => ['required', 'string', 'max:120'], 'city' => ['required', 'string', 'max:120'],
+            'birth_date' => ['required', 'date', 'before_or_equal:'.now()->subYears(18)->toDateString()], 'experience' => ['required', 'string', 'max:5000'],
+            'speaks_english' => ['required', 'boolean'], 'english_level' => [Rule::requiredIf(fn () => $this->boolean('speaks_english')), 'nullable', Rule::in(['A1', 'A2', 'B1', 'B2', 'C1', 'C2', 'NATIVE'])],
+            'availability' => ['required', 'string', 'max:100'], 'work_mode' => ['required', 'string', 'max:100', 'in:En estudio'],
             'source' => ['nullable', 'string', 'max:100'], 'motivation' => ['nullable', 'string', 'max:5000'],
             'goals' => ['nullable', 'array'], 'goals.*' => ['string', 'max:100'], 'data_consent' => ['accepted'],
             'identity_document' => ['nullable', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:5120'],
@@ -42,3 +44,4 @@ class StoreLeadRequest extends FormRequest
         });
     }
 }
+

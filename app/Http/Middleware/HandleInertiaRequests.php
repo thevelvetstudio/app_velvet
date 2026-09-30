@@ -4,6 +4,8 @@ namespace App\Http\Middleware;
 
 use Illuminate\Http\Request;
 use Inertia\Middleware;
+use App\Services\RealtimePublisher;
+use App\Services\NotificationService;
 
 class HandleInertiaRequests extends Middleware
 {
@@ -43,6 +45,10 @@ class HandleInertiaRequests extends Middleware
                     'permissions' => $user->roles->flatMap(fn ($role) => $role->permissions->pluck('slug'))->unique()->values(),
                 ]) : null,
             ],
+            'realtime' => $user ? [
+                'counters' => app(RealtimePublisher::class)->counters(),
+                'notifications' => app(NotificationService::class)->forUser($user),
+            ] : null,
         ];
     }
 }

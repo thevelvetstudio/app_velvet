@@ -20,7 +20,7 @@ class ApplicationReceivedMail extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'Recibimos tu aplicación · The Velvet Studio',
+            subject: 'Recibimos tu aplicación  ·  The Velvet Studio',
         );
     }
 
@@ -36,3 +36,4 @@ class ApplicationReceivedMail extends Mailable
         );
     }
 }
+

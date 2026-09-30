@@ -1,4 +1,4 @@
-import { Head, usePage } from '@inertiajs/react';
+﻿import { Head, usePage } from '@inertiajs/react';
 import { FiCheckCircle, FiClock, FiMail, FiShield, FiUser } from 'react-icons/fi';
 import { formatFriendlyDate } from '../../lib/date';
 import Layout from '../Admin/Recruitment/Layout';
@@ -54,3 +54,4 @@ export default function Edit({ mustVerifyEmail, status }) {
         </Layout>
     </>;
 }
+

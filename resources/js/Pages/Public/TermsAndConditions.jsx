@@ -1,4 +1,4 @@
-import LegalLayout from './LegalLayout';
+﻿import LegalLayout from './LegalLayout';
 
 function Section({ number, title, children }) {
     return <section><h2 className="text-lg font-semibold text-[#e5a1f2]">{number}. {title}</h2><div className="mt-2">{children}</div></section>;
@@ -19,3 +19,5 @@ export default function TermsAndConditions() {
         <p className="border-t border-[#292936] pt-6 text-xs text-[#85808d]">Última actualización: 20 de septiembre de 2026. Si modificamos estos términos, publicaremos la nueva versión en esta misma URL.</p>
     </LegalLayout>;
 }
+
+

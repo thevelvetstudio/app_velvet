@@ -9,6 +9,7 @@ use App\Models\CandidateActivity;
 use App\Models\Interview;
 use App\Models\InterviewSlot;
 use App\Services\InterviewInvitationService;
+use App\Services\RealtimePublisher;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -26,8 +27,18 @@ class InterviewController extends Controller
 
     public function index(): Response
     {
+        $timezone = 'America/Bogota';
         $slots = InterviewSlot::query()->with('interview.candidate.lead')
-            ->where('starts_at', '>=', now())->orderBy('starts_at')->limit(250)->get();
+            ->where('starts_at', '>=', now('UTC'))->orderBy('starts_at')->limit(250)->get();
+        $slots = $slots->map(function (InterviewSlot $slot) use ($timezone) {
+            $startsAt = Carbon::createFromFormat('Y-m-d H:i:s', $slot->getRawOriginal('starts_at'), 'UTC')->setTimezone($timezone);
+            $endsAt = Carbon::createFromFormat('Y-m-d H:i:s', $slot->getRawOriginal('ends_at'), 'UTC')->setTimezone($timezone);
+
+            return array_merge($slot->toArray(), [
+                'starts_at' => $startsAt->toIso8601String(),
+                'ends_at' => $endsAt->toIso8601String(),
+            ]);
+        });
         $candidates = Candidate::query()->with('lead')->whereIn('status', [CandidateStatus::PREQUALIFIED, CandidateStatus::INTERVIEW])
             ->whereHas('lead')->whereDoesntHave('interviews', fn ($query) => $query->whereIn('status', ['INVITED', 'SCHEDULED']))->latest()->get();
         $interviews = Interview::query()->with('candidate.lead', 'slot')->whereIn('status', ['INVITED', 'SCHEDULED'])
@@ -72,7 +83,59 @@ class InterviewController extends Controller
             $cursor->addDay();
         }
 
+        if ($created > 0) {
+            app(RealtimePublisher::class)->publish('interview.slots_generated', [
+                'notification' => ['title' => 'Horarios disponibles', 'description' => "Se generaron {$created} franjas de entrevista."],
+            ]);
+        }
+
         return back()->with('success', $created ? "Se generaron {$created} franjas de entrevista de una hora." : 'No había franjas nuevas para generar.');
+    }
+
+    public function updateSlot(Request $request, InterviewSlot $slot): RedirectResponse
+    {
+        abort_if($slot->status !== 'AVAILABLE' || $slot->interview()->exists(), 422, 'No se puede editar una franja reservada.');
+
+        $validated = $request->validate([
+            'date' => ['required', 'date', 'after_or_equal:today'],
+            'start_time' => ['required', 'date_format:H:i'],
+        ]);
+        $timezone = 'America/Bogota';
+        $start = Carbon::createFromFormat('Y-m-d H:i', "{$validated['date']} {$validated['start_time']}", $timezone);
+        abort_if($start->isPast(), 422, 'La franja debe estar en el futuro.');
+        $end = $start->copy()->addHour();
+
+        $duplicate = InterviewSlot::query()
+            ->where('id', '<>', $slot->id)
+            ->where('starts_at', $start->utc())
+            ->where('ends_at', $end->utc())
+            ->exists();
+        abort_if($duplicate, 422, 'Ya existe una franja con ese horario.');
+
+        $slot->update(['starts_at' => $start->utc(), 'ends_at' => $end->utc()]);
+
+        return back()->with('success', 'Franja actualizada correctamente.');
+    }
+
+    public function destroyAvailableSlots(): RedirectResponse
+    {
+        $deleted = InterviewSlot::query()
+            ->where('status', 'AVAILABLE')
+            ->whereDoesntHave('interview')
+            ->delete();
+
+        return back()->with('success', $deleted
+            ? "Se eliminaron {$deleted} franjas disponibles."
+            : 'No había franjas disponibles para eliminar.');
+    }
+
+    public function destroySlot(InterviewSlot $slot): RedirectResponse
+    {
+        abort_if($slot->status !== 'AVAILABLE' || $slot->interview()->exists(), 422, 'No se puede eliminar una franja reservada.');
+
+        $slot->delete();
+
+        return back()->with('success', 'Franja eliminada correctamente.');
     }
 
     public function invite(Request $request, Candidate $candidate): RedirectResponse
@@ -89,6 +152,8 @@ class InterviewController extends Controller
         if (! $interview) {
             return back()->withErrors(['interview' => 'Genera al menos una franja disponible antes de enviar la invitación.']);
         }
+        $activity = $candidate->activities()->latest('id')->first();
+        app(RealtimePublisher::class)->publishLead($candidate->fresh('lead'), 'interview.invited', ['interview_id' => $interview->id, 'activity' => $activity?->only(['id', 'description', 'created_at']), 'notification' => ['title' => 'Invitación de entrevista enviada', 'description' => "Se enviaron horarios a {$candidate->lead->full_name}."]]);
         return back()->with('success', 'Horarios de entrevista enviados al correo registrado.');
     }
 
@@ -97,6 +162,9 @@ class InterviewController extends Controller
         $validated = $request->validate(['status' => ['required', Rule::in(['SCHEDULED', 'COMPLETED', 'NO_SHOW', 'CANCELLED'])]]);
         $interview->update(['status' => $validated['status']]);
         if ($validated['status'] === 'CANCELLED' && $interview->slot) $interview->slot->update(['status' => 'AVAILABLE']);
+        $interview->load('candidate.lead');
+        $activity = CandidateActivity::create(['candidate_id' => $interview->candidate_id, 'user_id' => $request->user()->id, 'type' => 'interview_status_changed', 'description' => "Estado de entrevista actualizado a {$validated['status']}.", 'metadata' => ['interview_id' => $interview->id, 'status' => $validated['status']]]);
+        app(RealtimePublisher::class)->publishLead($interview->candidate->lead, 'interview.status_changed', ['interview_id' => $interview->id, 'activity' => $activity->only(['id', 'description', 'created_at']), 'notification' => ['title' => 'Entrevista actualizada', 'description' => "La entrevista de {$interview->candidate->lead->full_name} ahora está {$validated['status']}."]]);
         return back()->with('success', 'Estado de la entrevista actualizado.');
     }
 
@@ -129,7 +197,8 @@ class InterviewController extends Controller
     public function booking(Interview $interview, string $token): Response
     {
         $this->validateInvitation($interview, $token);
-        $slots = InterviewSlot::where('status', 'AVAILABLE')->where('starts_at', '>', now())->orderBy('starts_at')->get();
+        $slots = InterviewSlot::where('status', 'AVAILABLE')->where('starts_at', '>', now('UTC'))->orderBy('starts_at')->get()
+            ->map(fn (InterviewSlot $slot) => $this->formatSlotForTimezone($slot));
         $interview->load('candidate.lead');
         return Inertia::render('Public/InterviewBooking', [
             'candidate' => ['name' => $interview->candidate->lead->full_name, 'code' => $interview->candidate->code, 'type' => $interview->candidate->candidate_type->value],
@@ -146,10 +215,11 @@ class InterviewController extends Controller
         try {
             $interview = DB::transaction(function () use ($interview, $validated) {
                 $slot = InterviewSlot::whereKey($validated['slot_id'])->lockForUpdate()->firstOrFail();
-                abort_if($slot->status !== 'AVAILABLE' || $slot->starts_at->isPast(), 409, 'Este horario ya no está disponible. Elige otro.');
+                $slotStart = Carbon::createFromFormat('Y-m-d H:i:s', $slot->getRawOriginal('starts_at'), 'UTC');
+                abort_if($slot->status !== 'AVAILABLE' || $slotStart->isPast(), 409, 'Este horario ya no está disponible. Elige otro.');
                 $slot->update(['status' => 'BOOKED']);
-                $interview->update(['interview_slot_id' => $slot->id, 'scheduled_at' => $slot->starts_at, 'status' => 'SCHEDULED', 'confirmed_at' => now(), 'invitation_token_hash' => null]);
-                CandidateActivity::create(['candidate_id' => $interview->candidate_id, 'type' => 'interview_scheduled', 'description' => 'La candidata agendó su entrevista.', 'metadata' => ['scheduled_at' => $slot->starts_at->toIso8601String()]]);
+                $interview->update(['interview_slot_id' => $slot->id, 'scheduled_at' => $slot->getRawOriginal('starts_at'), 'status' => 'SCHEDULED', 'confirmed_at' => now(), 'invitation_token_hash' => null]);
+                $activity = CandidateActivity::create(['candidate_id' => $interview->candidate_id, 'type' => 'interview_scheduled', 'description' => 'La candidata agendó su entrevista.', 'metadata' => ['scheduled_at' => $slotStart->toIso8601String()]]);
                 return $interview->fresh(['candidate.lead', 'slot']);
             });
         } catch (\Throwable $exception) {
@@ -157,12 +227,27 @@ class InterviewController extends Controller
             throw $exception;
         }
         $whatsappUrl = $this->whatsappUrl($interview);
+        $activity = $interview->candidate->activities()->latest('id')->first();
+        app(RealtimePublisher::class)->publishLead($interview->candidate->lead, 'interview.scheduled', ['interview_id' => $interview->id, 'activity' => $activity?->only(['id', 'description', 'created_at']), 'notification' => ['title' => 'Entrevista agendada', 'description' => "{$interview->candidate->lead->full_name} agendó su entrevista."]]);
         try {
             Mail::to($interview->candidate->lead->email)->send(new InterviewScheduledMail($interview, $whatsappUrl));
         } catch (\Throwable $exception) {
             report($exception);
         }
-        return Inertia::render('Public/InterviewBookingSuccess', ['candidate' => ['name' => $interview->candidate->lead->full_name, 'code' => $interview->candidate->code], 'scheduledAt' => $interview->scheduled_at, 'whatsappUrl' => $whatsappUrl]);
+        $scheduledAt = Carbon::createFromFormat('Y-m-d H:i:s', $interview->getRawOriginal('scheduled_at'), 'UTC')->setTimezone('America/Bogota')->toIso8601String();
+        return Inertia::render('Public/InterviewBookingSuccess', ['candidate' => ['name' => $interview->candidate->lead->full_name, 'code' => $interview->candidate->code], 'scheduledAt' => $scheduledAt, 'whatsappUrl' => $whatsappUrl]);
+    }
+
+    private function formatSlotForTimezone(InterviewSlot $slot): array
+    {
+        $timezone = 'America/Bogota';
+        $startsAt = Carbon::createFromFormat('Y-m-d H:i:s', $slot->getRawOriginal('starts_at'), 'UTC')->setTimezone($timezone);
+        $endsAt = Carbon::createFromFormat('Y-m-d H:i:s', $slot->getRawOriginal('ends_at'), 'UTC')->setTimezone($timezone);
+
+        return array_merge($slot->toArray(), [
+            'starts_at' => $startsAt->toIso8601String(),
+            'ends_at' => $endsAt->toIso8601String(),
+        ]);
     }
 
     private function validateInvitation(Interview $interview, string $token): void
@@ -181,3 +266,4 @@ class InterviewController extends Controller
     }
 
 }
+

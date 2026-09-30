@@ -80,27 +80,44 @@ function PublicRouteOverlay() {
     return <div className={`apply-intro-overlay ${fading ? 'apply-intro-overlay--fading' : ''}`} role="status" aria-label="Cargando aplicación"><div className="apply-intro-overlay__content"><img src="/LOGO_OVERLAY.svg" alt="The Velvet Studio" className="apply-intro-overlay__logo" /><div className="apply-intro-overlay__progress-track"><div className="apply-intro-overlay__progress-bar" /></div></div></div>;
 }
 
+function ModuleSkeleton({ path, block }) {
+    const rows = (count = 6) => Array.from({ length: count }).map((_, index) => <div key={index} className="flex gap-4 border-t border-[#242833] p-4">{block('h-8 w-8')}{block('h-4 flex-1')}{block('h-4 w-24')}{block('h-4 w-20')}</div>);
+    const metricCards = (count = 3) => <div className="mt-7 grid gap-3 sm:grid-cols-3">{Array.from({ length: count }).map((_, index) => <div key={index} className="rounded-xl border border-[#242833] bg-[#10121a] p-5">{block('h-4 w-4')}{block('mt-5 h-7 w-16')}{block('mt-2 h-3 w-28')}</div>)}</div>;
+    const isNotificationHistory = path.includes('/notifications/history');
+    const isCandidateDetail = /\/candidates\/\d+$/.test(path);
+    const isLeadDetail = /\/leads\/\d+$/.test(path);
+
+    if (isCandidateDetail || isLeadDetail) return <div className="admin-page-content"><div className="flex flex-col justify-between gap-5 border-b border-[#20232d] pb-7 md:flex-row md:items-end"><div className="space-y-3">{block('h-3 w-48')}{block('h-10 w-96')}{block('h-3 w-32')}</div><div className="flex gap-3">{block('h-8 w-24')}{block('h-9 w-28')}</div></div><div className="mt-7 grid gap-5 xl:grid-cols-[1.35fr_.65fr]"><section className="rounded-xl border border-[#242833] bg-[#10121a] p-6">{block('h-4 w-48')}{block('mt-3 h-3 w-64')}{block('mt-8 h-56 w-full')}{block('mt-5 h-28 w-full')}</section><aside className="rounded-xl border border-[#242833] bg-[#10121a] p-6">{block('h-4 w-40')}{block('mt-5 h-40 w-full')}{block('mt-5 h-24 w-full')}</aside></div><section className="mt-6 rounded-xl border border-[#242833] bg-[#10121a] p-6">{block('h-4 w-48')}{block('mt-5 h-40 w-full')}</section></div>;
+    if (isNotificationHistory) return <div className="admin-page-content"><div className="space-y-3">{block('h-3 w-32')}{block('h-10 w-80')}{block('h-3 w-[30rem]')}</div><div className="mt-7 flex gap-2">{block('h-9 w-20')}{block('h-9 w-28')}{block('h-9 w-32')}</div><section className="mt-6 overflow-hidden rounded-xl border border-[#242833] bg-[#10121a]">{rows(8)}</section></div>;
+    if (path.endsWith('/leads')) return <div className="admin-page-content"><div className="flex flex-col justify-between gap-5 md:flex-row md:items-end"><div className="space-y-3">{block('h-3 w-24')}{block('h-10 w-48')}{block('h-3 w-96')}</div><div className="flex gap-2">{block('h-10 w-72')}{block('h-10 w-28')}</div></div>{metricCards(4)}<section className="mt-6 overflow-hidden rounded-xl border border-[#242833] bg-[#10121a]">{rows(7)}</section></div>;
+    if (path.endsWith('/candidates')) return <div className="admin-page-content"><div className="flex flex-col justify-between gap-5 md:flex-row md:items-end"><div className="space-y-3">{block('h-3 w-28')}{block('h-10 w-64')}{block('h-3 w-96')}</div><div className="flex gap-2">{block('h-10 w-72')}{block('h-10 w-28')}</div></div>{metricCards(3)}<div className="mt-6 grid gap-4 xl:grid-cols-2">{Array.from({ length: 6 }).map((_, index) => <article key={index} className="rounded-xl border border-[#242833] bg-[#10121a] p-5">{block('h-9 w-9')}{block('mt-4 h-4 w-48')}{block('mt-3 h-3 w-64')}{block('mt-5 h-2 w-full')}</article>)}</div></div>;
+    if (path.endsWith('/interviews')) return <div className="admin-page-content"><div className="flex flex-col justify-between gap-4 md:flex-row md:items-end"><div className="space-y-3">{block('h-3 w-24')}{block('h-10 w-56')}{block('h-3 w-96')}</div>{block('h-9 w-44')}</div><section className="mt-7 rounded-xl border border-[#242833] bg-[#10121a] p-6">{block('h-4 w-48')}{block('mt-4 h-10 w-full')}{rows(6)}</section><section className="mt-6 rounded-xl border border-[#242833] bg-[#10121a] p-6">{block('h-4 w-40')}{rows(4)}</section></div>;
+    if (path.endsWith('/calendar')) return <div className="admin-page-content"><div className="flex justify-between gap-4">{block('h-10 w-56')}{block('h-10 w-36')}</div><div className="mt-7 grid gap-5 xl:grid-cols-[1.5fr_.7fr]"><section className="rounded-xl border border-[#242833] bg-[#10121a] p-5">{block('h-8 w-full')}{block('mt-5 h-[28rem] w-full')}</section><aside className="rounded-xl border border-[#242833] bg-[#10121a] p-5">{block('h-4 w-40')}{rows(5)}</aside></div></div>;
+    if (path.endsWith('/processes')) return <div className="admin-page-content"><div className="space-y-3">{block('h-3 w-24')}{block('h-10 w-64')}{block('h-3 w-[30rem]')}</div><div className="mt-7 flex justify-end gap-2">{block('h-10 w-80')}{block('h-10 w-32')}{block('h-10 w-32')}</div>{metricCards(3)}<div className="mt-6 space-y-4">{Array.from({ length: 3 }).map((_, index) => <div key={index} className="rounded-xl border border-[#242833] bg-[#10121a] p-6">{block('h-4 w-64')}{block('mt-5 h-2 w-full')}{block('mt-2 h-2 w-full')}{block('mt-5 ml-auto h-9 w-24')}</div>)}</div></div>;
+    if (path.endsWith('/validations')) return <div className="admin-page-content"><div className="flex justify-between gap-4">{block('h-10 w-64')}{block('h-10 w-72')}</div>{metricCards(4)}<section className="mt-6 overflow-hidden rounded-xl border border-[#242833] bg-[#10121a]">{rows(6)}</section></div>;
+    if (path.endsWith('/users')) return <div className="admin-page-content"><div className="flex justify-between gap-4">{block('h-10 w-56')}{block('h-10 w-32')}</div><section className="mt-7 overflow-hidden rounded-xl border border-[#242833] bg-[#10121a]">{rows(8)}</section></div>;
+    if (path.endsWith('/access')) return <div className="admin-page-content"><div className="space-y-3">{block('h-3 w-24')}{block('h-10 w-64')}{block('h-3 w-96')}</div><div className="mt-7 grid gap-5 xl:grid-cols-[.7fr_1.3fr]"><aside className="rounded-xl border border-[#242833] bg-[#10121a] p-5">{rows(5)}</aside><section className="rounded-xl border border-[#242833] bg-[#10121a] p-6">{block('h-5 w-48')}{rows(7)}</section></div></div>;
+    if (path.endsWith('/workflows')) return <div className="admin-page-content"><div className="space-y-3">{block('h-3 w-24')}{block('h-10 w-64')}{block('h-3 w-96')}</div><div className="mt-7 grid gap-5 xl:grid-cols-2">{Array.from({ length: 2 }).map((_, index) => <section key={index} className="rounded-xl border border-[#242833] bg-[#10121a] p-6">{block('h-5 w-48')}{block('mt-3 h-3 w-72')}{rows(5)}</section>)}</div></div>;
+    return <div className="admin-page-content"><div className="space-y-3">{block('h-3 w-24')}{block('h-10 w-64')}</div>{metricCards(6)}<section className="mt-6 grid gap-5 xl:grid-cols-[1.55fr_.85fr]"><div className="rounded-xl border border-[#242833] bg-[#10121a] p-6">{block('h-4 w-48')}{block('mt-6 h-56 w-full')}</div><div className="rounded-xl border border-[#242833] bg-[#10121a] p-6">{block('h-4 w-40')}{block('mx-auto mt-8 h-40 w-40 rounded-full')}</div></section></div>;
+}
 function DashboardRouteSkeleton() {
     const [visible, setVisible] = useState(false);
+    const [targetPath, setTargetPath] = useState(() => window.location.pathname);
 
     useEffect(() => {
         const isDashboardPath = (pathname) => pathname === '/dashboard' || pathname.startsWith('/admin');
         const removeStartListener = router.on('start', (event) => {
             const pathname = pathFromVisit(event.detail?.visit);
+            setTargetPath(pathname);
             setVisible(isDashboardPath(pathname));
         });
         const removeFinishListener = router.on('finish', () => setVisible(false));
-
-        return () => {
-            removeStartListener();
-            removeFinishListener();
-        };
+        return () => { removeStartListener(); removeFinishListener(); };
     }, []);
 
     if (!visible) return null;
-
     const block = (className = '') => <span className={`block animate-pulse rounded-md bg-[#1a1d28] ${className}`} />;
-    return <div className="dashboard-route-skeleton" aria-busy="true" aria-label="Cargando módulo"><div className="admin-page-content"><div className="flex flex-col justify-between gap-5 md:flex-row md:items-end"><div className="space-y-3">{block('h-3 w-64')}{block('h-10 w-80')}</div><div className="flex gap-3">{block('h-8 w-24')}{block('h-10 w-36')}</div></div><div className="mt-7 flex items-center justify-between border-b border-[#20232d] pb-5">{block('h-3 w-40')}{block('h-9 w-56')}</div><section className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">{Array.from({ length: 6 }).map((_, index) => <div key={index} className="rounded-lg border border-[#242833] bg-[#10121a] p-4">{block('h-9 w-9')}{block('mt-5 h-3 w-24')}{block('mt-2 h-8 w-16')}{block('mt-4 h-2 w-full')}</div>)}</section><section className="mt-5 grid gap-4 xl:grid-cols-[1.55fr_.85fr]"><div className="rounded-lg border border-[#242833] bg-[#10121a] p-5">{block('h-4 w-48')}{block('mt-3 h-3 w-72')}{block('mt-8 h-56 w-full')}</div><div className="rounded-lg border border-[#242833] bg-[#10121a] p-5">{block('h-4 w-40')}{block('mt-3 h-3 w-56')}{block('mx-auto mt-8 h-40 w-40 rounded-full')}</div></section></div></div>;
+    return <div className="dashboard-route-skeleton" aria-busy="true" aria-label="Cargando módulo"><ModuleSkeleton path={targetPath} block={block} /></div>;
 }
 
 function GlobalCrudToasts() {
@@ -235,3 +252,4 @@ createInertiaApp({
         color: '#4B5563',
     },
 });
+

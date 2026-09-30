@@ -39,3 +39,4 @@ enum CandidateStatus: string
         };
     }
 }
+

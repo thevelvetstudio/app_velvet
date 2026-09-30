@@ -1,4 +1,4 @@
-import * as Dialog from '@radix-ui/react-dialog';
+﻿import * as Dialog from '@radix-ui/react-dialog';
 import { X } from 'lucide-react';
 
 export default function PrivacyPolicyModal({ open, onOpenChange }) {
@@ -31,3 +31,4 @@ export default function PrivacyPolicyModal({ open, onOpenChange }) {
         </Dialog.Root>
     );
 }
+

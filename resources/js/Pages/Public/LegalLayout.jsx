@@ -1,10 +1,10 @@
-import { Head, Link } from '@inertiajs/react';
+﻿import { Head, Link } from '@inertiajs/react';
 import { FiArrowLeft, FiFileText, FiShield } from 'react-icons/fi';
 import BrandMark from '../../Components/BrandMark';
 
 export default function LegalLayout({ title, description, eyebrow, children, updatedAt = '20 de septiembre de 2026' }) {
     return <>
-        <Head title={`${title} · The Velvet Studio`} />
+        <Head title={`${title}  ·  The Velvet Studio`} />
         <main className="min-h-screen bg-[#090a10] px-4 py-8 text-[#f7f1fb] sm:px-6 lg:py-12">
             <div className="mx-auto max-w-4xl">
                 <header className="flex flex-wrap items-center justify-between gap-4 border-b border-[#292936] pb-6">
@@ -20,3 +20,5 @@ export default function LegalLayout({ title, description, eyebrow, children, upd
         </main>
     </>;
 }
+
+

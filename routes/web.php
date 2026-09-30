@@ -9,6 +9,7 @@ use App\Http\Controllers\RecruitmentController;
 use App\Http\Controllers\InterviewController;
 use App\Http\Controllers\CalendarController;
 use App\Http\Controllers\UserAccessController;
+use App\Http\Controllers\NotificationController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -46,8 +47,14 @@ Route::middleware('auth')->group(function () {
             Route::get('/leads/{lead}', [RecruitmentController::class, 'lead'])->name('leads.show');
         });
         Route::put('/leads/{lead}', [RecruitmentController::class, 'updateLead'])->middleware('permission:leads.manage')->name('leads.update');
+        Route::patch('/leads/{lead}/status', [RecruitmentController::class, 'updateLeadStatus'])->middleware('permission:leads.manage')->name('leads.status.update');
         Route::post('/leads/{lead}/discard', [RecruitmentController::class, 'discardLead'])->middleware('permission:leads.manage')->name('leads.discard');
         Route::post('/leads/{lead}/convert', [RecruitmentController::class, 'convert'])->middleware('permission:candidates.convert')->name('leads.convert');
+        Route::post('/ably/token', [RecruitmentController::class, 'ablyToken'])->middleware('permission:leads.view')->name('ably.token');
+        Route::get('/ably/token', [RecruitmentController::class, 'ablyToken'])->middleware('permission:leads.view')->name('ably.token.get');
+        Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
+        Route::get('/notifications/history', [NotificationController::class, 'history'])->name('notifications.history');
+        Route::post('/notifications/read-all', [NotificationController::class, 'markAllRead'])->name('notifications.read-all');
         Route::middleware('permission:candidates.view')->group(function () {
             Route::get('/candidates', [RecruitmentController::class, 'candidates'])->name('candidates');
             Route::get('/candidates/{candidate}', [RecruitmentController::class, 'candidate'])->name('candidates.show');
@@ -72,6 +79,9 @@ Route::middleware('auth')->group(function () {
             Route::delete('/calendar/events/{calendarEvent}', [CalendarController::class, 'destroy'])->name('calendar.events.destroy');
         });
         Route::post('/interviews/slots', [InterviewController::class, 'generateSlots'])->middleware('permission:candidates.schedule_interview')->name('interviews.slots.generate');
+        Route::delete('/interviews/slots', [InterviewController::class, 'destroyAvailableSlots'])->middleware('permission:candidates.schedule_interview')->name('interviews.slots.destroy-available');
+        Route::patch('/interviews/slots/{slot}', [InterviewController::class, 'updateSlot'])->middleware('permission:candidates.schedule_interview')->name('interviews.slots.update');
+        Route::delete('/interviews/slots/{slot}', [InterviewController::class, 'destroySlot'])->middleware('permission:candidates.schedule_interview')->name('interviews.slots.destroy');
         Route::post('/candidates/{candidate}/interview-invitation', [InterviewController::class, 'invite'])->middleware('permission:candidates.schedule_interview')->name('candidates.interview.invite');
         Route::patch('/interviews/{interview}/status', [InterviewController::class, 'updateStatus'])->middleware('permission:candidates.schedule_interview')->name('interviews.status.update');
         Route::post('/interviews/{interview}/reschedule', [InterviewController::class, 'reschedule'])->middleware('permission:candidates.schedule_interview')->name('interviews.reschedule');

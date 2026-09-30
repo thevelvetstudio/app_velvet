@@ -83,7 +83,7 @@ export default function InterviewBooking({ candidate, slots = [], actionUrl, exp
                     {slots.length ? <div ref={pickerRef} className="relative mt-6">
                         <label className="mb-2 block text-xs font-medium text-[#d8d3dc]" htmlFor="interview-slot-search">Selecciona una fecha y hora</label>
                         <button type="button" onClick={() => setOpen((value) => !value)} aria-haspopup="listbox" aria-expanded={open} className={`flex w-full items-center justify-between gap-3 rounded-xl border px-4 py-4 text-left transition ${open ? 'border-[#c23bea] bg-[#1c1425] shadow-[0_0_0_1px_rgba(194,59,234,.2)]' : 'border-[#343044] bg-[#151522] hover:border-[#80508c]'}`}>
-                            <span className={selectedSlot ? 'text-sm text-[#eee8f2]' : 'text-sm text-[#898493]'}>{selectedSlot ? <><strong className="block capitalize font-medium">{display(selectedSlot.starts_at)}</strong><small className="mt-1 block text-xs text-[#898493]">{time(selectedSlot.starts_at)} – {time(selectedSlot.ends_at)} · 1 hora</small></> : 'Busca y selecciona un horario disponible'}</span>
+                            <span className={selectedSlot ? 'text-sm text-[#eee8f2]' : 'text-sm text-[#898493]'}>{selectedSlot ? <><strong className="block capitalize font-medium">{display(selectedSlot.starts_at)}</strong><small className="mt-1 block text-xs text-[#898493]">{time(selectedSlot.starts_at)} – {time(selectedSlot.ends_at)}  ·  1 hora</small></> : 'Busca y selecciona un horario disponible'}</span>
                             <FiChevronDown className={`shrink-0 text-[#d56bea] transition ${open ? 'rotate-180' : ''}`} />
                         </button>
                         {open && <div className="interview-slot-dropdown absolute z-[60] mt-2 w-full overflow-hidden rounded-xl border border-[#51405b] shadow-[0_18px_45px_rgba(0,0,0,.45)]">
@@ -95,7 +95,7 @@ export default function InterviewBooking({ candidate, slots = [], actionUrl, exp
                                 </div>
                             </div>
                             <div role="listbox" aria-label="Horarios disponibles" className="interview-slot-options max-h-80 overflow-y-auto p-2">
-                                {filteredSlots.length ? filteredSlots.map((slot) => <button type="button" role="option" aria-selected={String(form.data.slot_id) === String(slot.id)} key={slot.id} onClick={() => selectSlot(slot)} className={`interview-slot-option flex w-full items-center justify-between gap-3 rounded-lg px-3 py-3 text-left transition ${String(form.data.slot_id) === String(slot.id) ? 'is-selected' : ''}`}><span><strong className="block text-sm capitalize font-medium">{display(slot.starts_at)}</strong><small className="mt-1 block text-xs text-[#898493]">{time(slot.starts_at)} – {time(slot.ends_at)} · 1 hora</small></span><FiClock className="shrink-0 text-[#d56bea]" /></button>) : <p className="px-3 py-6 text-center text-xs text-[#898493]">No encontramos horarios para esa búsqueda.</p>}
+                                {filteredSlots.length ? filteredSlots.map((slot) => <button type="button" role="option" aria-selected={String(form.data.slot_id) === String(slot.id)} key={slot.id} onClick={() => selectSlot(slot)} className={`interview-slot-option flex w-full items-center justify-between gap-3 rounded-lg px-3 py-3 text-left transition ${String(form.data.slot_id) === String(slot.id) ? 'is-selected' : ''}`}><span><strong className="block text-sm capitalize font-medium">{display(slot.starts_at)}</strong><small className="mt-1 block text-xs text-[#898493]">{time(slot.starts_at)} – {time(slot.ends_at)}  ·  1 hora</small></span><FiClock className="shrink-0 text-[#d56bea]" /></button>) : <p className="px-3 py-6 text-center text-xs text-[#898493]">No encontramos horarios para esa búsqueda.</p>}
                             </div>
                         </div>}
                     </div> : <p className="mt-6 rounded-lg border border-[#624b2b] bg-[#2b2115] px-4 py-3 text-sm text-[#f2cf91]">No quedan horarios disponibles. Comunícate con nuestro equipo para recibir una nueva invitación.</p>}
@@ -110,3 +110,4 @@ export default function InterviewBooking({ candidate, slots = [], actionUrl, exp
         </main>
     </>;
 }
+

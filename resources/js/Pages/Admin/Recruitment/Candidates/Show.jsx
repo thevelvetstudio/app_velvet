@@ -1,18 +1,63 @@
 import { Head, Link, router, useForm } from '@inertiajs/react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { FaWhatsapp } from 'react-icons/fa6';
 import { FiArrowLeft, FiArrowRight, FiCheckCircle, FiClock, FiEdit3, FiFileText, FiMail, FiShield, FiTrash2, FiUser, FiX, FiCalendar } from 'react-icons/fi';
-import { formatFriendlyDateTime } from '../../../../lib/date';
+import { formatFriendlyDate, formatFriendlyDateTime } from '../../../../lib/date';
 import { candidateStatusLabels, candidateTypeLabels } from '../../../../lib/recruitmentLabels';
 import AdminApplicationEditModal from '../../../../Components/AdminApplicationEditModal';
 import Layout from '../Layout';
+import { subscribeToRealtime } from '../../../../lib/ably';
 
 const statusOptions = Object.entries(candidateStatusLabels).filter(([value]) => value !== 'DISCARDED');
 const completedStatuses = new Set(['PREQUALIFIED', 'ADMITTED', 'WAITING', 'DISCARDED', 'ONBOARDING', 'CONTRACTING', 'INDUCTION', 'READY_TO_ACTIVATE', 'ACTIVE', 'WITHDRAWN']);
+const sexLabels = { WOMAN: 'Mujer', MAN: 'Hombre' };
 const identityStatusLabels = { NOT_STARTED: 'Sin iniciar', IN_PROGRESS: 'En progreso', IN_REVIEW: 'En revisión manual', APPROVED: 'Identidad verificada', DECLINED: 'No aprobada', EXPIRED: 'Sesión vencida', ABANDONED: 'No completada' };
 
 function Detail({ label, value }) {
     return <div><dt className="text-[10px] uppercase tracking-[.18em] text-[#7f8495]">{label}</dt><dd className="mt-2 text-sm text-[#f2edf5]">{value || 'No indicado'}</dd></div>;
+}
+
+const processStageDescriptions = {
+    NEW: 'Aplicaci\u00f3n recibida y pendiente de primer contacto.',
+    CONTACTED: 'El equipo ya contact\u00f3 a la persona y confirm\u00f3 su inter\u00e9s.',
+    QUALIFIED: 'El perfil cumple los criterios iniciales del proceso.',
+    PREQUALIFIED: 'La precalificaci\u00f3n fue completada y aprobada.',
+    INTERVIEW: 'La persona est\u00e1 lista para seleccionar o realizar una entrevista.',
+    EVALUATION: 'El equipo est\u00e1 evaluando el resultado de la entrevista.',
+    ADMITTED: 'La persona fue admitida para continuar con la vinculaci\u00f3n.',
+    WAITING: 'El proceso est\u00e1 en espera de una definici\u00f3n o acci\u00f3n.',
+    ONBOARDING: 'La persona est\u00e1 completando el proceso de incorporaci\u00f3n.',
+    CONTRACTING: 'Se est\u00e1n gestionando los documentos de contrataci\u00f3n.',
+    INDUCTION: 'La persona est\u00e1 realizando la inducci\u00f3n inicial.',
+    READY_TO_ACTIVATE: 'El perfil est\u00e1 listo para ser activado.',
+    ACTIVE: 'La persona est\u00e1 activa en el sistema.',
+    WITHDRAWN: 'La persona se retir\u00f3 del proceso.',
+};
+
+const cleanStatusLabel = (value) => String(value || '')
+    .replace(/\u00c3\u00a1/g, '\u00e1').replace(/\u00c3\u00a9/g, '\u00e9').replace(/\u00c3\u00ad/g, '\u00ed')
+    .replace(/\u00c3\u00b3/g, '\u00f3').replace(/\u00c3\u00ba/g, '\u00fa').replace(/\u00c3\u00b1/g, '\u00f1')
+    .replace(/\u00c2/g, '').replace(/\u00e2\u0080\u00a6/g, '...');
+
+function ProcessStatusCarousel({ currentStatus, onChange }) {
+    const stages = statusOptions;
+    const activeIndex = Math.max(0, stages.findIndex(([value]) => value === currentStatus));
+    const [selectedIndex, setSelectedIndex] = useState(activeIndex);
+    const selectedStage = stages[selectedIndex] || stages[0];
+
+    useEffect(() => setSelectedIndex(activeIndex), [activeIndex]);
+
+    return <div className="rounded-xl border border-[#292d39] bg-[#11131c]/90 p-5 shadow-[0_18px_55px_rgba(0,0,0,.16)] sm:p-6">
+        <div className="flex items-center justify-between gap-4">
+            <div><p className="text-[10px] uppercase tracking-[.18em] text-[#d56bea]">Estado del proceso</p><p className="mt-2 text-xs text-[#969baa]">La etapa activa se actualiza para todo el equipo en tiempo real.</p></div>
+            <span className="rounded-full border border-[#9142a7]/60 bg-[#3d164d] px-3 py-1.5 text-xs text-[#f0c1fa]">{cleanStatusLabel(selectedStage?.[1])}</span>
+        </div>
+        <div className="mt-5 min-w-0 overflow-hidden">
+            <div className="process-carousel-scroll flex gap-3 overflow-x-auto pb-3" aria-label="Etapas del proceso">
+                {stages.map(([value, label], index) => <button type="button" key={value} onClick={() => { setSelectedIndex(index); if (value !== currentStatus) onChange(value); }} className={`min-w-[220px] flex-1 rounded-xl border p-4 text-left transition ${value === currentStatus ? 'border-[#c22be8] bg-[#291336] shadow-[0_0_18px_rgba(194,43,232,.18)]' : index === selectedIndex ? 'border-[#8c3c9e] bg-[#1b1625]' : 'border-[#343044] bg-[#151522] hover:border-[#694574]'}`}><div className="flex items-center justify-between gap-3"><span className="text-xs font-semibold text-white">{cleanStatusLabel(label)}</span><span className={`h-2.5 w-2.5 rounded-full ${value === currentStatus ? 'bg-[#c22be8] shadow-[0_0_10px_#c22be8]' : 'bg-[#555064]'}`} /></div><p className="mt-3 text-xs leading-5 text-[#969baa]">{processStageDescriptions[value] || 'Etapa del proceso de selecci\u00f3n.'}</p>{value === currentStatus && <p className="mt-3 text-[10px] font-medium uppercase tracking-[.14em] text-[#e4a3f1]">Etapa activa</p>}</button>)}
+            </div>
+        </div>
+    </div>;
 }
 
 export default function Show({ candidate }) {
@@ -23,13 +68,20 @@ export default function Show({ candidate }) {
     const fullName = [candidate.lead.first_name, candidate.lead.last_name].filter(Boolean).join(' ');
     const whatsappNumber = String(candidate.lead.phone || '').replace(/\D/g, '');
     const whatsappHref = whatsappNumber ? `https://wa.me/${whatsappNumber.startsWith('57') ? whatsappNumber : `57${whatsappNumber}`}?text=${encodeURIComponent(`Hola ${fullName}, te escribe el equipo de The Velvet Studio. Revisa tu correo para completar los requisitos iniciales de tu proceso.`)}` : null;
-    const emailHref = candidate.lead.email ? `mailto:${candidate.lead.email}?subject=${encodeURIComponent('Requisitos iniciales · The Velvet Studio')}` : null;
+    const emailHref = candidate.lead.email ? `mailto:${candidate.lead.email}?subject=${encodeURIComponent('Requisitos iniciales  ·  The Velvet Studio')}` : null;
     const formCompleted = Boolean(candidate.prequalification_completed_at);
     const canSendForm = !formCompleted && !completedStatuses.has(candidate.status);
     const formSent = Boolean(candidate.prequalification_sent_at);
     const interview = candidate.interviews?.find((item) => ['INVITED', 'SCHEDULED'].includes(item.status));
     const identityStatus = candidate.identity_verification_status || 'NOT_STARTED';
     const identityData = candidate.identity_verification_data || {};
+
+    useEffect(() => subscribeToRealtime((event, eventName) => {
+        if (Number(event.candidate_id) !== Number(candidate.id)) return;
+        if (eventName === 'candidate.prequalification_completed' || eventName === 'candidate.status_changed') {
+            router.reload({ only: ['candidate', 'realtime'], preserveScroll: true, preserveState: true });
+        }
+    }), [candidate.id]);
 
     const discard = (event) => {
         event.preventDefault();
@@ -50,16 +102,16 @@ export default function Show({ candidate }) {
             <div>
                 <Link href="/admin/candidates" className="inline-flex items-center gap-2 text-sm text-[#d56bea] transition hover:text-white"><FiArrowLeft size={15} /> Candidatos</Link>
                 <div className="mt-7 flex flex-col justify-between gap-5 border-b border-[#252936] pb-7 md:flex-row md:items-end">
-                    <div><p className="text-[10px] uppercase tracking-[.28em] text-[#d56bea]">Perfil de candidata · {candidate.code}</p><h1 className="mt-3 font-editorial text-4xl text-white">{fullName}</h1><p className="mt-2 text-sm text-[#969baa]">{candidateTypeLabels[candidate.candidate_type] || candidate.candidate_type}</p></div>
+                    <div><p className="text-[10px] uppercase tracking-[.28em] text-[#d56bea]">Perfil de candidata  ·  {candidate.code}</p><h1 className="mt-3 font-editorial text-4xl text-white">{fullName}</h1><p className="mt-2 text-sm text-[#969baa]">{candidateTypeLabels[candidate.candidate_type] || candidate.candidate_type}</p></div>
                     <div className="flex flex-wrap items-center gap-2"><span className="w-fit rounded-full border border-[#9142a7]/50 bg-[#3d164d] px-3 py-1.5 text-xs text-[#f0c1fa]">{candidateStatusLabels[candidate.status] || candidate.status}</span><button type="button" onClick={() => setEditing((value) => !value)} className="inline-flex items-center gap-2 rounded-lg border border-[#49334f] px-3 py-2 text-xs text-[#e6c4ed] transition hover:border-[#a84bc2] hover:text-white"><FiEdit3 size={14} />{editing ? 'Cerrar edición' : 'Editar datos'}</button>{candidate.status !== 'DISCARDED' && <button type="button" onClick={() => setDiscarding(true)} className="inline-flex items-center gap-2 rounded-lg border border-[#673344] px-3 py-2 text-xs text-[#ffb1bd] transition hover:border-[#bb4c66] hover:bg-[#321622]"><FiTrash2 size={14} />Descartar</button>}</div>
                 </div>
                 <AdminApplicationEditModal open={editing} onClose={() => setEditing(false)} endpoint={`/admin/candidates/${candidate.id}`} person={candidate.lead} candidateType={candidate.candidate_type} title="Editar información del candidato" />
                 <div className="mt-8 grid gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(300px,.65fr)]">
                     <section className="rounded-xl border border-[#292d39] bg-[#11131c]/90 p-6 shadow-[0_18px_55px_rgba(0,0,0,.16)] backdrop-blur-xl sm:p-8">
                         <div className="flex items-center gap-3 border-b border-[#292d39] pb-5"><span className="grid h-10 w-10 place-items-center rounded-full bg-[#3c1749] text-[#e2a0f1]"><FiUser size={18} /></span><div><p className="text-sm font-medium text-white">Información de la persona</p><p className="mt-1 text-xs text-[#7f8495]">Datos enviados en el onboarding público.</p></div></div>
-                        <dl className="mt-7 grid gap-x-8 gap-y-7 sm:grid-cols-2"><Detail label="Nombre completo" value={fullName} /><Detail label="Email" value={candidate.lead.email} /><Detail label="WhatsApp" value={candidate.lead.phone} /><Detail label="Ciudad" value={candidate.lead.city} /><Detail label="Disponibilidad" value={candidate.lead.availability} /><Detail label="Modalidad" value={candidate.lead.work_mode} /></dl>
+                        <dl className="mt-7 grid gap-x-8 gap-y-7 sm:grid-cols-2"><Detail label="Nombre completo" value={fullName} /><Detail label="Sexo" value={sexLabels[candidate.lead.sex] || candidate.lead.sex} /><Detail label="Email" value={candidate.lead.email} /><Detail label="WhatsApp" value={candidate.lead.phone} /><Detail label="Ciudad" value={candidate.lead.city} /><Detail label="País" value={candidate.lead.country} /><Detail label="Fecha de nacimiento" value={candidate.lead.birth_date ? formatFriendlyDate(candidate.lead.birth_date) : null} /><Detail label="Habla inglés" value={candidate.lead.speaks_english ? 'Sí' : 'No'} /><Detail label="Nivel de inglés" value={candidate.lead.speaks_english ? candidate.lead.english_level : 'No aplica'} /><Detail label="Disponibilidad" value={candidate.lead.availability} /><Detail label="Modalidad" value={candidate.lead.work_mode} /></dl>
                         {candidate.lead.experience && <div className="mt-8 border-t border-[#292d39] pt-7"><p className="text-[10px] uppercase tracking-[.18em] text-[#7f8495]">Experiencia</p><p className="mt-3 whitespace-pre-line text-sm leading-7 text-[#c3c6d1]">{candidate.lead.experience}</p></div>}
-                        <div className="mt-8 border-t border-[#292d39] pt-7"><div className="flex items-center justify-between gap-4"><div><p className="text-[10px] uppercase tracking-[.18em] text-[#7f8495]">Estado del proceso</p><p className="mt-2 text-xs text-[#969baa]">Actualiza la etapa cuando completes cada revisión.</p></div>{candidate.status === 'DISCARDED' ? <span className="text-xs text-[#ffb1bd]">Candidato descartado</span> : <select value={candidate.status} onChange={changeStatus} className="velvet-dashboard-select" aria-label="Estado del candidato">{statusOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>}</div>{candidate.discard_reason && <p className="mt-4 rounded-lg border border-[#673344] bg-[#321622]/50 px-3 py-2 text-xs leading-5 text-[#ffb1bd]"><strong>Motivo del descarte:</strong> {candidate.discard_reason}</p>}</div>
+                        <div className="mt-8 border-t border-[#292d39] pt-7"><ProcessStatusCarousel currentStatus={candidate.status} onChange={(status) => changeStatus({ target: { value: status } })} />{candidate.discard_reason && <p className="mt-4 rounded-lg border border-[#673344] bg-[#321622]/50 px-3 py-2 text-xs leading-5 text-[#ffb1bd]"><strong>Motivo del descarte:</strong> {candidate.discard_reason}</p>}</div>
                     </section>
                     <aside className="rounded-xl border border-[#292d39] bg-[#11131c]/90 p-6 shadow-[0_18px_55px_rgba(0,0,0,.16)] backdrop-blur-xl sm:p-7">
                         <div className="space-y-8">
@@ -75,3 +127,4 @@ export default function Show({ candidate }) {
         </Layout>
     </>;
 }
+

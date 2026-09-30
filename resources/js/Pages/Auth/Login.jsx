@@ -1,4 +1,4 @@
-import { Head, Link, useForm } from '@inertiajs/react';
+﻿import { Head, Link, useForm } from '@inertiajs/react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { useState } from 'react';
 import {
@@ -194,3 +194,4 @@ export default function Login({ status, canResetPassword }) {
         </GuestLayout>
     );
 }
+
