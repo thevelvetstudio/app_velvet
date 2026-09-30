@@ -10,4 +10,16 @@ enum LeadStatus: string
     case UNRESPONSIVE = 'UNRESPONSIVE';
     case DISCARDED = 'DISCARDED';
     case CONVERTED = 'CONVERTED';
+
+    public function label(): string
+    {
+        return match ($this) {
+            self::NEW => 'Nueva',
+            self::CONTACTED => 'Contactada',
+            self::QUALIFIED => 'Calificada',
+            self::UNRESPONSIVE => 'Sin respuesta',
+            self::DISCARDED => 'Descartada',
+            self::CONVERTED => 'Convertida',
+        };
+    }
 }

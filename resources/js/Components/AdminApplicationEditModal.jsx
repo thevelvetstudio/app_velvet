@@ -4,21 +4,31 @@ import { useForm } from '@inertiajs/react';
 import VelvetDatePicker from '@/Components/VelvetDatePicker';
 import VelvetPhoneInput from '@/Components/VelvetPhoneInput';
 import VelvetSelect from '@/Components/VelvetSelect';
+import CountrySelect from '@/Components/CountrySelect';
+import { Switch } from '@/Components/ui/switch';
 import { colombianCities } from '@/lib/colombianCities';
 
 const sexOptions = [
     { value: 'WOMAN', label: 'Mujer' },
     { value: 'MAN', label: 'Hombre' },
-    { value: 'TRANS_WOMAN', label: 'Mujer trans' },
-    { value: 'TRANS_MAN', label: 'Hombre trans' },
-    { value: 'NON_BINARY', label: 'No binario' },
-    { value: 'GENDER_FLUID', label: 'Género fluido' },
-    { value: 'AGENDER', label: 'Agénero' },
-    { value: 'SELF_DESCRIBE', label: 'Otro / Prefiero autodescribir' },
-    { value: 'PREFER_NOT_TO_SAY', label: 'Prefiero no decir' },
 ];
 const availabilityOptions = ['Tiempo completo', 'Medio tiempo', 'Por horas'];
 const sourceOptions = ['Instagram', 'TikTok', 'Facebook', 'Google', 'Referido', 'Evento', 'Otro'];
+const countryOptions = [
+    { value: 'Colombia', code: 'CO', label: 'Colombia' }, { value: 'Argentina', code: 'AR', label: 'Argentina' },
+    { value: 'Brasil', code: 'BR', label: 'Brasil' }, { value: 'Chile', code: 'CL', label: 'Chile' },
+    { value: 'Ecuador', code: 'EC', label: 'Ecuador' }, { value: 'España', code: 'ES', label: 'España' },
+    { value: 'Estados Unidos', code: 'US', label: 'Estados Unidos' }, { value: 'México', code: 'MX', label: 'México' },
+    { value: 'Panamá', code: 'PA', label: 'Panamá' }, { value: 'Perú', code: 'PE', label: 'Perú' },
+    { value: 'Puerto Rico', code: 'PR', label: 'Puerto Rico' }, { value: 'República Dominicana', code: 'DO', label: 'República Dominicana' },
+    { value: 'Uruguay', code: 'UY', label: 'Uruguay' }, { value: 'Venezuela', code: 'VE', label: 'Venezuela' },
+];
+const englishLevels = [
+    { value: 'A1', label: 'A1 · Inicial' }, { value: 'A2', label: 'A2 · Básico' },
+    { value: 'B1', label: 'B1 · Intermedio' }, { value: 'B2', label: 'B2 · Intermedio alto' },
+    { value: 'C1', label: 'C1 · Avanzado' }, { value: 'C2', label: 'C2 · Dominio avanzado' },
+    { value: 'NATIVE', label: 'Nativo' },
+];
 
 export default function AdminApplicationEditModal({ open, onClose, endpoint, person, candidateType, title }) {
     const form = useForm({
@@ -28,12 +38,15 @@ export default function AdminApplicationEditModal({ open, onClose, endpoint, per
         sex: person.sex || '',
         phone: person.phone || '',
         email: person.email || '',
+        country: person.country || 'Colombia',
         city: person.city || 'Manizales',
         birth_date: person.birth_date?.slice(0, 10) || '',
         experience: person.experience || '',
+        speaks_english: Boolean(person.speaks_english),
+        english_level: person.english_level || '',
         motivation: person.motivation || '',
         availability: person.availability || 'Tiempo completo',
-        work_mode: person.work_mode || (candidateType === 'MONITOR' ? 'En estudio' : 'Desde casa'),
+        work_mode: 'En estudio',
         source: person.source || '',
     });
 
@@ -46,7 +59,7 @@ export default function AdminApplicationEditModal({ open, onClose, endpoint, per
     if (!open) return null;
 
     const set = (name) => (event) => form.setData(name, event.target.value);
-    const workModeOptions = form.data.candidate_type === 'MONITOR' ? ['En estudio'] : ['Desde casa', 'En estudio', 'Híbrido'];
+    const workModeOptions = ['En estudio'];
     const textField = (name, label, props = {}) => (
         <label className="apply-field-label">
             {label}
@@ -70,11 +83,13 @@ export default function AdminApplicationEditModal({ open, onClose, endpoint, per
                 {textField('email', 'Email', { type: 'email', required: true, autoComplete: 'email' })}
                 <label className="apply-field-label">WhatsApp<VelvetPhoneInput value={form.data.phone} onChange={(value) => form.setData('phone', value)} error={form.errors.phone} /></label>
                 <VelvetSelect label="Ciudad" value={form.data.city} onChange={set('city')} options={colombianCities} error={form.errors.city} />
-                {form.data.candidate_type === 'MODEL' ? <VelvetDatePicker label="Fecha de nacimiento" value={form.data.birth_date} onChange={set('birth_date')} error={form.errors.birth_date} /> : <div />}
+                <CountrySelect value={form.data.country} onChange={set('country')} options={countryOptions} error={form.errors.country} />
+                <VelvetDatePicker label="Fecha de nacimiento" value={form.data.birth_date} onChange={set('birth_date')} error={form.errors.birth_date} />
                 <VelvetSelect label="Modalidad preferida" value={form.data.work_mode} onChange={set('work_mode')} options={workModeOptions} error={form.errors.work_mode} />
                 <VelvetSelect label="Disponibilidad horaria" value={form.data.availability} onChange={set('availability')} options={availabilityOptions} error={form.errors.availability} />
                 <VelvetSelect label="¿Cómo conociste Velvet?" value={form.data.source} onChange={set('source')} options={sourceOptions} error={form.errors.source} />
                 <label className="apply-field-label sm:col-span-2">Experiencia relevante<textarea value={form.data.experience} onChange={set('experience')} rows="5" className={`velvet-input ${form.errors.experience ? 'is-error' : ''}`} placeholder="Cuéntanos sobre tu experiencia relacionada con el perfil." />{form.errors.experience && <span className="apply-field-error">{form.errors.experience}</span>}</label>
+                <div className="sm:col-span-2"><div className="flex min-h-12 items-center justify-between gap-4 rounded-lg border border-[#353544] bg-[#11121a] px-4 py-3"><span><strong className="block text-xs font-medium text-[#f1ecf4]">¿Habla inglés?</strong><small className="mt-1 block text-[11px] text-[#777d8f]">Indica si puede comunicarse en inglés.</small></span><Switch checked={form.data.speaks_english} onCheckedChange={(checked) => { form.setData('speaks_english', checked); if (!checked) form.setData('english_level', ''); }} aria-label="¿Habla inglés?" /></div>{form.data.speaks_english && <VelvetSelect label="Nivel de inglés" value={form.data.english_level} onChange={set('english_level')} options={englishLevels} error={form.errors.english_level} />}</div>
                 <label className="apply-field-label sm:col-span-2">¿Por qué quieres trabajar con Velvet?<textarea value={form.data.motivation} onChange={set('motivation')} rows="4" className={`velvet-input ${form.errors.motivation ? 'is-error' : ''}`} placeholder="Comparte tus motivaciones y expectativas." />{form.errors.motivation && <span className="apply-field-error">{form.errors.motivation}</span>}</label>
             </div>
             <div className="mt-8 flex flex-col-reverse justify-end gap-3 border-t border-[#292d39] pt-5 sm:flex-row"><button type="button" onClick={onClose} className="rounded-lg border border-[#343044] px-5 py-3 text-sm text-[#c9c2cf] transition hover:border-[#6b5872] hover:text-white">Cancelar</button><button type="submit" disabled={form.processing} className="velvet-button gap-2">{form.processing ? 'Guardando…' : 'Guardar cambios'}<FiArrowRight size={16} /></button></div>

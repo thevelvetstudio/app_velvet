@@ -3,6 +3,7 @@
 namespace App\Mail;
 
 use App\Models\Interview;
+use Carbon\Carbon;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
@@ -28,14 +29,14 @@ class InterviewScheduledMail extends Mailable
         return new Content(view: 'emails.interview-scheduled', with: [
             'applicantName' => $this->interview->candidate->lead->full_name,
             'candidateCode' => $this->interview->candidate->code,
-            'scheduledAt' => $this->interview->scheduled_at,
+            'scheduledAt' => $this->scheduledAtUtc(),
             'whatsappUrl' => $this->whatsappUrl,
         ]);
     }
 
     public function attachments(): array
     {
-        $start = $this->interview->scheduled_at->clone()->utc();
+        $start = $this->scheduledAtUtc();
         $end = $start->clone()->addHour();
         $uid = 'interview-' . $this->interview->id . '@thevelvetstudio.co';
         $ics = implode("\r\n", [
@@ -47,6 +48,11 @@ class InterviewScheduledMail extends Mailable
         ]);
 
         return [Attachment::fromData(fn () => $ics, 'entrevista-velvet.ics')->withMime('text/calendar')];
+    }
+
+    private function scheduledAtUtc(): Carbon
+    {
+        return Carbon::createFromFormat('Y-m-d H:i:s', $this->interview->getRawOriginal('scheduled_at'), 'UTC');
     }
 }
 

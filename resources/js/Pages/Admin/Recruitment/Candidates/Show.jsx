@@ -2,7 +2,7 @@ import { Head, Link, router, useForm } from '@inertiajs/react';
 import { useEffect, useState } from 'react';
 import { FaWhatsapp } from 'react-icons/fa6';
 import { FiArrowLeft, FiArrowRight, FiCheckCircle, FiClock, FiEdit3, FiFileText, FiMail, FiShield, FiTrash2, FiUser, FiX, FiCalendar } from 'react-icons/fi';
-import { formatFriendlyDateTime } from '../../../../lib/date';
+import { formatFriendlyDate, formatFriendlyDateTime } from '../../../../lib/date';
 import { candidateStatusLabels, candidateTypeLabels } from '../../../../lib/recruitmentLabels';
 import AdminApplicationEditModal from '../../../../Components/AdminApplicationEditModal';
 import Layout from '../Layout';
@@ -10,6 +10,7 @@ import { subscribeToRealtime } from '../../../../lib/ably';
 
 const statusOptions = Object.entries(candidateStatusLabels).filter(([value]) => value !== 'DISCARDED');
 const completedStatuses = new Set(['PREQUALIFIED', 'ADMITTED', 'WAITING', 'DISCARDED', 'ONBOARDING', 'CONTRACTING', 'INDUCTION', 'READY_TO_ACTIVATE', 'ACTIVE', 'WITHDRAWN']);
+const sexLabels = { WOMAN: 'Mujer', MAN: 'Hombre' };
 const identityStatusLabels = { NOT_STARTED: 'Sin iniciar', IN_PROGRESS: 'En progreso', IN_REVIEW: 'En revisión manual', APPROVED: 'Identidad verificada', DECLINED: 'No aprobada', EXPIRED: 'Sesión vencida', ABANDONED: 'No completada' };
 
 function Detail({ label, value }) {
@@ -108,7 +109,7 @@ export default function Show({ candidate }) {
                 <div className="mt-8 grid gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(300px,.65fr)]">
                     <section className="rounded-xl border border-[#292d39] bg-[#11131c]/90 p-6 shadow-[0_18px_55px_rgba(0,0,0,.16)] backdrop-blur-xl sm:p-8">
                         <div className="flex items-center gap-3 border-b border-[#292d39] pb-5"><span className="grid h-10 w-10 place-items-center rounded-full bg-[#3c1749] text-[#e2a0f1]"><FiUser size={18} /></span><div><p className="text-sm font-medium text-white">Información de la persona</p><p className="mt-1 text-xs text-[#7f8495]">Datos enviados en el onboarding público.</p></div></div>
-                        <dl className="mt-7 grid gap-x-8 gap-y-7 sm:grid-cols-2"><Detail label="Nombre completo" value={fullName} /><Detail label="Email" value={candidate.lead.email} /><Detail label="WhatsApp" value={candidate.lead.phone} /><Detail label="Ciudad" value={candidate.lead.city} /><Detail label="Disponibilidad" value={candidate.lead.availability} /><Detail label="Modalidad" value={candidate.lead.work_mode} /></dl>
+                        <dl className="mt-7 grid gap-x-8 gap-y-7 sm:grid-cols-2"><Detail label="Nombre completo" value={fullName} /><Detail label="Sexo" value={sexLabels[candidate.lead.sex] || candidate.lead.sex} /><Detail label="Email" value={candidate.lead.email} /><Detail label="WhatsApp" value={candidate.lead.phone} /><Detail label="Ciudad" value={candidate.lead.city} /><Detail label="País" value={candidate.lead.country} /><Detail label="Fecha de nacimiento" value={candidate.lead.birth_date ? formatFriendlyDate(candidate.lead.birth_date) : null} /><Detail label="Habla inglés" value={candidate.lead.speaks_english ? 'Sí' : 'No'} /><Detail label="Nivel de inglés" value={candidate.lead.speaks_english ? candidate.lead.english_level : 'No aplica'} /><Detail label="Disponibilidad" value={candidate.lead.availability} /><Detail label="Modalidad" value={candidate.lead.work_mode} /></dl>
                         {candidate.lead.experience && <div className="mt-8 border-t border-[#292d39] pt-7"><p className="text-[10px] uppercase tracking-[.18em] text-[#7f8495]">Experiencia</p><p className="mt-3 whitespace-pre-line text-sm leading-7 text-[#c3c6d1]">{candidate.lead.experience}</p></div>}
                         <div className="mt-8 border-t border-[#292d39] pt-7"><ProcessStatusCarousel currentStatus={candidate.status} onChange={(status) => changeStatus({ target: { value: status } })} />{candidate.discard_reason && <p className="mt-4 rounded-lg border border-[#673344] bg-[#321622]/50 px-3 py-2 text-xs leading-5 text-[#ffb1bd]"><strong>Motivo del descarte:</strong> {candidate.discard_reason}</p>}</div>
                     </section>

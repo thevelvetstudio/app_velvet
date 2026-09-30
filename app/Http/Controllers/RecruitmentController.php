@@ -16,6 +16,7 @@ use App\Models\LeadActivity;
 use App\Models\LeadDocument;
 use App\Models\Lead;
 use App\Models\OnboardingDraft;
+use App\Services\ApplicationDiscardMailService;
 use App\Services\RecruitmentDashboardService;
 use App\Services\InterviewInvitationService;
 use Illuminate\Http\RedirectResponse;
@@ -108,8 +109,7 @@ class RecruitmentController extends Controller
             'work_mode' => ['required', 'string', 'max:100'],
             'experience' => ['required', 'string', 'min:20', 'max:5000'],
             'motivation' => ['required', 'string', 'min:20', 'max:5000'],
-            'portfolio_url' => ['nullable', 'url', 'max:500'],
-            'has_equipment' => ['required', 'boolean'],
+            'social_networks' => ['nullable', 'string', 'max:500'],
             'identity_document' => ['nullable', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:5120'],
             'accept_terms' => ['accepted'],
         ]);
@@ -629,12 +629,15 @@ class RecruitmentController extends Controller
         ])]);
     }
 
-    public function updateLeadStatus(Request $request, Lead $lead, InterviewInvitationService $invitationService): RedirectResponse
+    public function updateLeadStatus(Request $request, Lead $lead, InterviewInvitationService $invitationService, ApplicationDiscardMailService $discardMail): RedirectResponse
     {
         $lead->loadMissing('candidate');
         $allowed = $lead->candidate ? CandidateStatus::cases() : LeadStatus::cases();
         $validated = $request->validate(['status' => ['required', Rule::in(array_map(fn ($status) => $status->value, $allowed))]]);
         $previous = $lead->candidate?->status?->value ?: $lead->status?->value;
+        $discardTransition = $validated['status'] === CandidateStatus::DISCARDED->value
+            && $previous !== CandidateStatus::DISCARDED->value
+            && $previous !== LeadStatus::DISCARDED->value;
 
         if ($lead->candidate && $validated['status'] === CandidateStatus::INTERVIEW->value && $previous !== CandidateStatus::INTERVIEW->value) {
             try {
@@ -651,9 +654,20 @@ class RecruitmentController extends Controller
         }
 
         if ($lead->candidate) {
-            $lead->candidate->update(['status' => $validated['status']]);
+            $candidateAttributes = ['status' => $validated['status']];
+            if ($discardTransition && ! $lead->candidate->discarded_at) {
+                $candidateAttributes['discarded_at'] = now();
+            }
+            if ($discardTransition && $request->filled('reason')) {
+                $candidateAttributes['discard_reason'] = $request->string('reason')->trim()->value();
+            }
+            $lead->candidate->update($candidateAttributes);
         } else {
-            $lead->update(['status' => $validated['status']]);
+            $leadAttributes = ['status' => $validated['status']];
+            if ($validated['status'] === LeadStatus::DISCARDED->value && $request->filled('reason')) {
+                $leadAttributes['discard_reason'] = $request->string('reason')->trim()->value();
+            }
+            $lead->update($leadAttributes);
         }
 
         $previousLabel = $lead->candidate
@@ -672,8 +686,12 @@ class RecruitmentController extends Controller
         ]);
         $this->publishLeadEvent($lead->fresh('candidate'), 'lead.status_changed', [
             'activity' => ['id' => $activity->id, 'description' => $activity->description, 'created_at' => $activity->created_at?->toIso8601String()],
-            'notification' => ['title' => 'Etapa actualizada', 'description' => "{$lead->full_name}: {$nextLabel}.",],
+            'notification' => ['title' => 'Etapa actualizada', 'description' => "{$lead->full_name}: {$nextLabel}."],
         ]);
+
+        if ($discardTransition) {
+            $discardMail->send($lead->fresh('candidate'), $previous ?: LeadStatus::NEW->value);
+        }
 
         return back()->with('success', 'Estado actualizado correctamente.');
     }
@@ -729,12 +747,17 @@ class RecruitmentController extends Controller
         return back()->with('success', 'Información del lead actualizada correctamente.');
     }
 
-    public function discardLead(Request $request, Lead $lead): RedirectResponse
+    public function discardLead(Request $request, Lead $lead, ApplicationDiscardMailService $discardMail): RedirectResponse
     {
         if ($lead->candidate) {
             return back()->withErrors(['discard' => 'Este lead ya es candidato. Descártalo desde su perfil de candidato.']);
         }
 
+        if ($lead->status === LeadStatus::DISCARDED) {
+            return to_route('admin.leads')->with('success', 'Este lead ya estaba descartado.');
+        }
+
+        $previous = $lead->status?->value ?: LeadStatus::NEW->value;
         $validated = $request->validate(['reason' => ['required', 'string', 'min:5', 'max:1000']]);
         $lead->update(['status' => LeadStatus::DISCARDED, 'discard_reason' => $validated['reason']]);
         $activity = LeadActivity::create([
@@ -745,6 +768,7 @@ class RecruitmentController extends Controller
             'metadata' => ['reason' => $validated['reason']],
         ]);
         $this->publishLeadEvent($lead->fresh('candidate'), 'lead.discarded', ['activity' => $activity->only(['id', 'description', 'created_at']), 'notification' => ['title' => 'Lead descartado', 'description' => "{$lead->full_name} fue descartado."]]);
+        $discardMail->send($lead->fresh('candidate'), $previous);
 
         return to_route('admin.leads')->with('success', 'Lead descartado correctamente.');
     }
@@ -753,7 +777,26 @@ class RecruitmentController extends Controller
     {
         $candidate = $convert->handle($lead);
         $activity = $lead->activities()->latest('id')->first();
-        $this->publishLeadEvent($lead->fresh('candidate'), 'lead.converted', ['candidate_id' => $candidate->id, 'activity' => $activity?->only(['id', 'description', 'created_at']), 'notification' => ['title' => 'Lead convertido', 'description' => "{$lead->full_name} pasó a {$candidate->code}."]]);
+        $leadId = $lead->id;
+        $candidateId = $candidate->id;
+        $activityData = $activity?->only(['id', 'description', 'created_at']);
+        $leadName = $lead->full_name;
+        $candidateCode = $candidate->code;
+
+        app()->terminating(function () use ($leadId, $candidateId, $activityData, $leadName, $candidateCode): void {
+            try {
+                $eventLead = Lead::query()->with('candidate')->find($leadId);
+                if (! $eventLead) return;
+
+                app(\App\Services\RealtimePublisher::class)->publishLead($eventLead, 'lead.converted', [
+                    'candidate_id' => $candidateId,
+                    'activity' => $activityData,
+                    'notification' => ['title' => 'Lead convertido', 'description' => "{$leadName} pasó a {$candidateCode}."],
+                ]);
+            } catch (\Throwable $exception) {
+                report($exception);
+            }
+        });
 
         return to_route('admin.leads.show', $lead)->with('success', "Lead convertido a {$candidate->code}.");
     }
@@ -815,8 +858,14 @@ class RecruitmentController extends Controller
         return back()->with('success', 'Información del candidato actualizada correctamente.');
     }
 
-    public function discardCandidate(Request $request, Candidate $candidate): RedirectResponse
+    public function discardCandidate(Request $request, Candidate $candidate, ApplicationDiscardMailService $discardMail): RedirectResponse
     {
+        $candidate->loadMissing('lead');
+        if ($candidate->status === CandidateStatus::DISCARDED) {
+            return to_route('admin.candidates.show', $candidate)->with('success', 'Este candidato ya estaba descartado.');
+        }
+
+        $previous = $candidate->status?->value ?: CandidateStatus::NEW->value;
         $validated = $request->validate(['reason' => ['required', 'string', 'min:5', 'max:1000']]);
         $candidate->update([
             'status' => CandidateStatus::DISCARDED,
@@ -832,15 +881,17 @@ class RecruitmentController extends Controller
         ]);
         $candidate->load('lead');
         $this->publishLeadEvent($candidate->lead, 'candidate.discarded', ['candidate_id' => $candidate->id, 'activity' => $activity->only(['id', 'description', 'created_at']), 'notification' => ['title' => 'Candidato descartado', 'description' => "{$candidate->lead->full_name} fue descartado."]]);
+        $discardMail->send($candidate->lead, $previous);
 
         return to_route('admin.candidates.show', $candidate)->with('success', 'Candidato descartado correctamente.');
     }
 
-    public function updateCandidateStatus(Request $request, Candidate $candidate, InterviewInvitationService $invitationService): RedirectResponse
+    public function updateCandidateStatus(Request $request, Candidate $candidate, InterviewInvitationService $invitationService, ApplicationDiscardMailService $discardMail): RedirectResponse
     {
         $validated = $request->validate(['status' => ['required', Rule::in(array_column(CandidateStatus::cases(), 'value'))]]);
         $nextStatus = CandidateStatus::from($validated['status']);
         $previousStatus = $candidate->status;
+        $discardTransition = $nextStatus === CandidateStatus::DISCARDED && $previousStatus !== CandidateStatus::DISCARDED;
 
         if ($nextStatus === CandidateStatus::DISCARDED && ! $request->filled('reason')) {
             return back()->withErrors(['status' => 'Usa la opción “Descartar” e indica el motivo.']);
@@ -878,6 +929,9 @@ class RecruitmentController extends Controller
         if ($nextStatus === CandidateStatus::DISCARDED && ! $candidate->discarded_at) {
             $attributes['discarded_at'] = now();
         }
+        if ($discardTransition) {
+            $attributes['discard_reason'] = $request->string('reason')->trim()->value();
+        }
         if ($nextStatus === CandidateStatus::CONTRACTING && ! $candidate->contracted_at) {
             $attributes['contracted_at'] = now();
         }
@@ -892,6 +946,10 @@ class RecruitmentController extends Controller
         ]);
         $candidate->load('lead');
         $this->publishLeadEvent($candidate->lead, 'candidate.status_changed', ['candidate_id' => $candidate->id, 'activity' => $activity->only(['id', 'description', 'created_at']), 'notification' => ['title' => 'Estado de candidato actualizado', 'description' => "{$candidate->lead->full_name}: {$nextStatus->label()}."]]);
+
+        if ($discardTransition) {
+            $discardMail->send($candidate->lead, $previousStatus?->value ?: CandidateStatus::NEW->value);
+        }
 
         return back()->with('success', "Estado actualizado a {$nextStatus->label()}.");
     }
@@ -931,15 +989,18 @@ class RecruitmentController extends Controller
             'candidate_type' => ['required', Rule::in(['MODEL', 'MONITOR'])],
             'first_name' => ['required', 'string', 'max:100'],
             'last_name' => ['required', 'string', 'max:100'],
-            'sex' => ['required', Rule::in(['WOMAN', 'MAN', 'TRANS_WOMAN', 'TRANS_MAN', 'NON_BINARY', 'GENDER_FLUID', 'AGENDER', 'SELF_DESCRIBE', 'PREFER_NOT_TO_SAY'])],
+            'sex' => ['required', Rule::in(['WOMAN', 'MAN'])],
             'phone' => ['required', 'string', 'max:40'],
             'email' => ['required', 'email', 'max:255'],
+            'country' => ['sometimes', 'required', 'string', 'max:120'],
             'city' => ['required', 'string', 'max:100'],
             'birth_date' => ['nullable', 'required_if:candidate_type,MODEL', 'date', 'before_or_equal:' . now()->subYears(18)->toDateString()],
             'experience' => ['nullable', 'string', 'max:5000'],
+            'speaks_english' => ['sometimes', 'boolean'],
+            'english_level' => [Rule::requiredIf(fn () => $this->boolean('speaks_english')), 'nullable', Rule::in(['A1', 'A2', 'B1', 'B2', 'C1', 'C2', 'NATIVE'])],
             'motivation' => ['nullable', 'string', 'max:5000'],
             'availability' => ['required', 'string', 'max:100'],
-            'work_mode' => array_merge(['required', 'string', 'max:100'], request()->input('candidate_type') === 'MONITOR' ? ['in:En estudio'] : []),
+            'work_mode' => ['required', 'string', 'max:100', 'in:En estudio'],
             'source' => ['nullable', 'string', 'max:100'],
         ];
     }
@@ -1213,5 +1274,3 @@ class RecruitmentController extends Controller
         }
     }
 }
-
-

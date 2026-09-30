@@ -79,6 +79,9 @@ Route::middleware('auth')->group(function () {
             Route::delete('/calendar/events/{calendarEvent}', [CalendarController::class, 'destroy'])->name('calendar.events.destroy');
         });
         Route::post('/interviews/slots', [InterviewController::class, 'generateSlots'])->middleware('permission:candidates.schedule_interview')->name('interviews.slots.generate');
+        Route::delete('/interviews/slots', [InterviewController::class, 'destroyAvailableSlots'])->middleware('permission:candidates.schedule_interview')->name('interviews.slots.destroy-available');
+        Route::patch('/interviews/slots/{slot}', [InterviewController::class, 'updateSlot'])->middleware('permission:candidates.schedule_interview')->name('interviews.slots.update');
+        Route::delete('/interviews/slots/{slot}', [InterviewController::class, 'destroySlot'])->middleware('permission:candidates.schedule_interview')->name('interviews.slots.destroy');
         Route::post('/candidates/{candidate}/interview-invitation', [InterviewController::class, 'invite'])->middleware('permission:candidates.schedule_interview')->name('candidates.interview.invite');
         Route::patch('/interviews/{interview}/status', [InterviewController::class, 'updateStatus'])->middleware('permission:candidates.schedule_interview')->name('interviews.status.update');
         Route::post('/interviews/{interview}/reschedule', [InterviewController::class, 'reschedule'])->middleware('permission:candidates.schedule_interview')->name('interviews.reschedule');
