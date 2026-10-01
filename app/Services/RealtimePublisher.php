@@ -76,6 +76,7 @@ class RealtimePublisher
 
     public function channelFor(string $event): string
     {
+        if (str_starts_with($event, 'room.')) return config('services.ably.channels.rooms');
         if (str_starts_with($event, 'interview.')) return config('services.ably.channels.interviews');
         if (in_array($event, ['candidate.identity_updated', 'candidate.prequalification_sent', 'candidate.prequalification_completed'], true)) {
             return config('services.ably.channels.onboarding');

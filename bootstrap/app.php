@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\EnsurePermission;
+use App\Http\Middleware\EnsureActiveOperationalProfile;
 use App\Http\Middleware\HandleInertiaRequests;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -23,7 +24,10 @@ return Application::configure(basePath: dirname(__DIR__))
             AddLinkHeadersForPreloadedAssets::class,
         ]);
 
-        $middleware->alias(['permission' => EnsurePermission::class]);
+        $middleware->alias([
+            'permission' => EnsurePermission::class,
+            'active.profile' => EnsureActiveOperationalProfile::class,
+        ]);
 
         // Didit calls this endpoint server-to-server, without a Laravel CSRF token.
         $middleware->validateCsrfTokens(except: ['webhooks/didit']);

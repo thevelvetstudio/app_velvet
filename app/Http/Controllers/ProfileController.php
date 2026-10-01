@@ -18,9 +18,21 @@ class ProfileController extends Controller
      */
     public function edit(Request $request): Response
     {
+        $candidate = $request->user()->loadMissing('candidate')->candidate;
+        $identityData = $candidate?->identity_verification_data ?? [];
+        $portrait = collect($identityData['images'] ?? [])->first(function ($image) {
+            $label = mb_strtolower((string) ($image['label'] ?? ''));
+            return str_contains($label, 'retrato') || str_contains($label, 'selfie') || str_contains($label, 'facial');
+        });
+
         return Inertia::render('Profile/Edit', [
             'mustVerifyEmail' => $request->user() instanceof MustVerifyEmail,
             'status' => session('status'),
+            'identityVerification' => [
+                'verified' => $candidate?->identity_verification_status === 'APPROVED',
+                'portraitUrl' => $portrait['url'] ?? null,
+                'provider' => $identityData['provider'] ?? null,
+            ],
         ]);
     }
 

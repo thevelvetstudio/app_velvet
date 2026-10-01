@@ -33,7 +33,15 @@ class AuthenticatedSessionController extends Controller
 
         $request->session()->regenerate();
 
-        return redirect()->intended(route('dashboard', absolute: false));
+        // El portal inicial debe depender del rol actual. No usamos la URL
+        // intended porque una ruta administrativa guardada en sesión
+        // podría enviar a un monitor o modelo al panel de reclutamiento.
+        $user = $request->user();
+        $destination = $user->hasRole('model')
+            ? 'model.dashboard'
+            : ($user->hasRole('monitor') ? 'monitor.dashboard' : 'admin.recruitment');
+
+        return redirect()->to(route($destination, absolute: false));
     }
 
     /**

@@ -24,6 +24,7 @@ class RolePermissionSeeder extends Seeder
             ['name' => 'Crear candidatos', 'slug' => 'candidates.create', 'group' => 'Reclutamiento'],
             ['name' => 'Actualizar candidatos', 'slug' => 'candidates.update', 'group' => 'Reclutamiento'],
             ['name' => 'Cambiar estado de candidatos', 'slug' => 'candidates.change_status', 'group' => 'Reclutamiento'],
+            ['name' => 'Activar acceso de candidatos', 'slug' => 'candidates.activate_access', 'group' => 'Reclutamiento'],
             ['name' => 'Agregar notas a candidatos', 'slug' => 'candidates.add_note', 'group' => 'Reclutamiento'],
             ['name' => 'Programar entrevistas', 'slug' => 'candidates.schedule_interview', 'group' => 'Reclutamiento'],
             ['name' => 'Solicitar documentos', 'slug' => 'candidates.request_documents', 'group' => 'Reclutamiento'],
@@ -36,6 +37,7 @@ class RolePermissionSeeder extends Seeder
             ['name' => 'Gestionar onboarding', 'slug' => 'onboarding.manage', 'group' => 'Onboarding'],
             ['name' => 'Ver onboarding', 'slug' => 'onboarding.view', 'group' => 'Onboarding'],
             ['name' => 'Ver documentos', 'slug' => 'documents.view', 'group' => 'Documentos'],
+            ['name' => 'Administrar documentos', 'slug' => 'documents.manage', 'group' => 'Documentos'],
             ['name' => 'Solicitar documentos', 'slug' => 'documents.request', 'group' => 'Documentos'],
             ['name' => 'Verificar documentos', 'slug' => 'documents.verify', 'group' => 'Documentos'],
             ['name' => 'Ver contratos', 'slug' => 'contracts.view', 'group' => 'Contratos'],
@@ -69,6 +71,12 @@ class RolePermissionSeeder extends Seeder
             ['name' => 'Ver salas', 'slug' => 'rooms.view', 'group' => 'Sedes y salas'],
             ['name' => 'Gestionar salas', 'slug' => 'rooms.manage', 'group' => 'Sedes y salas'],
             ['name' => 'Gestionar salas del equipo', 'slug' => 'rooms.manage_team', 'group' => 'Sedes y salas'],
+            ['name' => 'Ver rooms propias', 'slug' => 'rooms.view_own', 'group' => 'Sedes y salas'],
+            ['name' => 'Reservar rooms propias', 'slug' => 'rooms.reserve_own', 'group' => 'Sedes y salas'],
+            ['name' => 'Administrar uso propio de rooms', 'slug' => 'rooms.use_own', 'group' => 'Sedes y salas'],
+            ['name' => 'Ver rooms del equipo', 'slug' => 'rooms.view_team', 'group' => 'Sedes y salas'],
+            ['name' => 'Gestionar reservas de rooms', 'slug' => 'rooms.manage_reservations', 'group' => 'Sedes y salas'],
+            ['name' => 'Gestionar uso de rooms', 'slug' => 'rooms.manage_usage', 'group' => 'Sedes y salas'],
             ['name' => 'Ver perfil propio', 'slug' => 'profile.view_own', 'group' => 'Portal'],
             ['name' => 'Actualizar perfil propio', 'slug' => 'profile.update_own', 'group' => 'Portal'],
             ['name' => 'Ver documentos propios', 'slug' => 'documents.view_own', 'group' => 'Portal'],
@@ -105,11 +113,11 @@ class RolePermissionSeeder extends Seeder
         ])->all();
 
         $all = array_keys($permissions);
-        $recruiting = ['dashboard.view', 'leads.view', 'leads.create', 'leads.manage', 'candidates.view', 'candidates.view_all', 'candidates.create', 'candidates.update', 'candidates.change_status', 'candidates.add_note', 'candidates.schedule_interview', 'candidates.request_documents', 'candidates.approve', 'candidates.reject', 'candidates.convert', 'interviews.view', 'documents.view', 'documents.verify', 'calendar.view', 'calendar.manage'];
-        $hr = ['dashboard.view', 'candidates.view', 'candidates.view_all', 'onboarding.view', 'onboarding.manage', 'documents.view', 'documents.request', 'documents.verify', 'contracts.view', 'contracts.create', 'contracts.update', 'contracts.approve', 'personal_data.view', 'personal_data.update', 'models.create_from_candidate', 'calendar.view'];
-        $manager = ['dashboard.view', 'models.view_team', 'models.assign_monitor', 'models.change_monitor', 'monitors.view_team', 'shifts.view_team', 'shifts.manage_team', 'goals.create', 'goals.update', 'goals.assign', 'metrics.view_team', 'incidents.view_team', 'incidents.manage', 'rooms.view', 'rooms.manage_team', 'calendar.view', 'calendar.manage', 'users.view', 'users.create', 'users.update', 'users.disable'];
-        $monitor = ['dashboard.view', 'models.view_assigned', 'models.view_metrics', 'models.add_note', 'models.add_followup', 'models.view_goals', 'shifts.view_assigned', 'shifts.update_status', 'incidents.create', 'incidents.view_assigned', 'goals.view_assigned'];
-        $model = ['profile.view_own', 'profile.update_own', 'documents.view_own', 'documents.upload_own', 'shifts.view_own', 'goals.view_own', 'metrics.view_own', 'training.view', 'requests.create', 'requests.view_own', 'payments.view_own'];
+        $recruiting = ['dashboard.view', 'leads.view', 'leads.create', 'leads.manage', 'candidates.view', 'candidates.view_all', 'candidates.create', 'candidates.update', 'candidates.change_status', 'candidates.activate_access', 'candidates.add_note', 'candidates.schedule_interview', 'candidates.request_documents', 'candidates.approve', 'candidates.reject', 'candidates.convert', 'contracts.create', 'interviews.view', 'documents.view', 'documents.verify', 'calendar.view', 'calendar.manage'];
+        $hr = ['dashboard.view', 'candidates.view', 'candidates.view_all', 'onboarding.view', 'onboarding.manage', 'documents.view', 'documents.manage', 'documents.request', 'documents.verify', 'contracts.view', 'contracts.create', 'contracts.update', 'contracts.approve', 'personal_data.view', 'personal_data.update', 'models.create_from_candidate', 'calendar.view'];
+        $manager = ['dashboard.view', 'models.view_team', 'models.assign_monitor', 'models.change_monitor', 'monitors.view_team', 'shifts.view_team', 'shifts.manage_team', 'goals.create', 'goals.update', 'goals.assign', 'metrics.view_team', 'incidents.view_team', 'incidents.manage', 'rooms.view', 'rooms.manage_team', 'rooms.view_team', 'rooms.manage_reservations', 'rooms.manage_usage', 'calendar.view', 'calendar.manage', 'users.view', 'users.create', 'users.update', 'users.disable'];
+        $monitor = ['dashboard.view', 'models.view_assigned', 'models.view_metrics', 'models.add_note', 'models.add_followup', 'models.view_goals', 'shifts.view_assigned', 'shifts.update_status', 'incidents.create', 'incidents.view_assigned', 'goals.view_assigned', 'documents.view_own', 'rooms.view_team', 'rooms.manage_reservations', 'rooms.manage_usage'];
+        $model = ['dashboard.view', 'profile.view_own', 'profile.update_own', 'documents.view_own', 'shifts.view_own', 'goals.view_own', 'metrics.view_own', 'training.view', 'requests.create', 'requests.view_own', 'payments.view_own', 'rooms.view_own', 'rooms.reserve_own', 'rooms.use_own'];
         $candidate = ['profile.view_own', 'profile.update_own', 'documents.view_own', 'documents.upload_own', 'personal_data.view', 'personal_data.update', 'requests.create', 'requests.view_own'];
         $definitionsByRole = [
             ['name' => 'Super Administrador', 'slug' => 'super_admin', 'description' => 'Acceso global a toda la plataforma.', 'parent' => null, 'is_system' => true, 'permissions' => $all],
@@ -123,7 +131,7 @@ class RolePermissionSeeder extends Seeder
             ['name' => 'Director de Operaciones', 'slug' => 'operations_director', 'description' => 'Supervisa la operación de equipos y salas.', 'parent' => 'super_admin', 'is_system' => false, 'permissions' => array_values(array_unique(array_merge($manager, $hr)))],
             ['name' => 'Marketing', 'slug' => 'marketing', 'description' => 'Gestiona las iniciativas de marketing.', 'parent' => 'super_admin', 'is_system' => false, 'permissions' => ['dashboard.view', 'marketing.manage']],
             ['name' => 'Finanzas', 'slug' => 'finance', 'description' => 'Gestiona procesos financieros autorizados.', 'parent' => 'super_admin', 'is_system' => false, 'permissions' => ['dashboard.view', 'finance.manage', 'payments.view_own']],
-            ['name' => 'Compliance', 'slug' => 'compliance', 'description' => 'Supervisa cumplimiento y auditoría.', 'parent' => 'super_admin', 'is_system' => false, 'permissions' => ['dashboard.view', 'documents.view', 'documents.verify', 'contracts.view', 'compliance.manage', 'audit.view']],
+            ['name' => 'Compliance', 'slug' => 'compliance', 'description' => 'Supervisa cumplimiento y auditoría.', 'parent' => 'super_admin', 'is_system' => false, 'permissions' => ['dashboard.view', 'documents.view', 'documents.manage', 'documents.verify', 'contracts.view', 'compliance.manage', 'audit.view']],
             ['name' => 'Soporte', 'slug' => 'support', 'description' => 'Atiende solicitudes y soporte interno.', 'parent' => 'super_admin', 'is_system' => false, 'permissions' => ['dashboard.view', 'support.manage']],
         ];
 

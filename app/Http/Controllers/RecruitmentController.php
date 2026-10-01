@@ -7,7 +7,11 @@ use App\Actions\CreateLead;
 use App\Mail\ApplicationReceivedMail;
 use App\Mail\PrequalificationCompletedMail;
 use App\Mail\PrequalificationFormMail;
+use App\Mail\CandidateAccessCredentialsMail;
+use App\Mail\CandidateActivatedMail;
+use App\Mail\ContractingRequirementsMail;
 use App\Enums\CandidateStatus;
+use App\Enums\CandidateType;
 use App\Enums\LeadStatus;
 use App\Http\Requests\StoreLeadRequest;
 use App\Models\Candidate;
@@ -16,7 +20,9 @@ use App\Models\LeadActivity;
 use App\Models\LeadDocument;
 use App\Models\Lead;
 use App\Models\OnboardingDraft;
+use App\Models\TrainingRecord;
 use App\Services\ApplicationDiscardMailService;
+use App\Services\AdmittedMailService;
 use App\Services\RecruitmentDashboardService;
 use App\Services\InterviewInvitationService;
 use Illuminate\Http\RedirectResponse;
@@ -26,13 +32,16 @@ use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
+use App\Models\User;
 
 class RecruitmentController extends Controller
 {
@@ -407,8 +416,16 @@ class RecruitmentController extends Controller
         }
     }
 
-    public function dashboard(Request $request, RecruitmentDashboardService $dashboard): Response
+    public function dashboard(Request $request, RecruitmentDashboardService $dashboard): Response|RedirectResponse
     {
+        if ($request->user()->hasRole('model')) {
+            return to_route('model.dashboard');
+        }
+
+        if ($request->user()->hasRole('monitor')) {
+            return to_route('monitor.dashboard');
+        }
+
         $request->validate([
             'period' => ['nullable', 'in:today,7d,30d,month,custom'],
             'type' => ['nullable', 'in:MODEL,MONITOR'],
@@ -610,7 +627,7 @@ class RecruitmentController extends Controller
 
     public function lead(Lead $lead): Response
     {
-        $lead->load(['activities.user', 'candidate.activities.user']);
+        $lead->load(['activities.user', 'candidate.activities.user', 'documents']);
         $processActivities = $lead->activities
             ->map(fn (LeadActivity $activity) => array_merge($activity->toArray(), ['description' => $this->localizeActivityDescription($activity->description), 'source' => 'lead', 'timeline_id' => "lead-{$activity->id}"]))
             ->concat($lead->candidate?->activities?->map(fn (CandidateActivity $activity) => array_merge($activity->toArray(), ['description' => $this->localizeActivityDescription($activity->description), 'source' => 'candidate', 'timeline_id' => "candidate-{$activity->id}"])) ?? collect())
@@ -629,9 +646,9 @@ class RecruitmentController extends Controller
         ])]);
     }
 
-    public function updateLeadStatus(Request $request, Lead $lead, InterviewInvitationService $invitationService, ApplicationDiscardMailService $discardMail): RedirectResponse
+    public function updateLeadStatus(Request $request, Lead $lead, InterviewInvitationService $invitationService, ApplicationDiscardMailService $discardMail, AdmittedMailService $admittedMail): RedirectResponse
     {
-        $lead->loadMissing('candidate');
+        $lead->loadMissing('candidate.user');
         $allowed = $lead->candidate ? CandidateStatus::cases() : LeadStatus::cases();
         $validated = $request->validate(['status' => ['required', Rule::in(array_map(fn ($status) => $status->value, $allowed))]]);
         $previous = $lead->candidate?->status?->value ?: $lead->status?->value;
@@ -651,6 +668,26 @@ class RecruitmentController extends Controller
             if (! $interview) {
                 return back()->withErrors(['status' => 'No hay horarios disponibles. Genera al menos una franja antes de pasar a entrevista.']);
             }
+        }
+
+        if ($lead->candidate && $validated['status'] === CandidateStatus::ADMITTED->value && $previous !== CandidateStatus::EVALUATION->value) {
+            return back()->withErrors(['status' => 'El candidato debe estar en evaluación antes de ser admitido.']);
+        }
+
+        if ($lead->candidate && $validated['status'] === CandidateStatus::WAITING->value && $previous === CandidateStatus::ADMITTED->value) {
+            return back()->withErrors(['status' => 'Inicia la contratacion desde la accion recomendada para enviar los requisitos por correo.']);
+        }
+
+        if ($lead->candidate && $validated['status'] === CandidateStatus::CONTRACTING->value && $previous !== CandidateStatus::WAITING->value) {
+            return back()->withErrors(['status' => 'El candidato debe estar admitido antes de iniciar la contratación.']);
+        }
+
+        if ($lead->candidate && $validated['status'] === CandidateStatus::ONBOARDING->value && $previous !== CandidateStatus::CONTRACTING->value) {
+            return back()->withErrors(['status' => 'El candidato debe completar la contratación antes de pasar a onboarding.']);
+        }
+
+        if ($lead->candidate && $validated['status'] === CandidateStatus::ACTIVE->value && (! $lead->candidate->user_id || ! $lead->candidate->user?->is_active)) {
+            return back()->withErrors(['status' => 'Activa primero el acceso al dashboard desde el panel administrativo.']);
         }
 
         if ($lead->candidate) {
@@ -677,20 +714,32 @@ class RecruitmentController extends Controller
             ? CandidateStatus::tryFrom($validated['status'])?->label()
             : LeadStatus::tryFrom($validated['status'])?->label();
 
-        $activity = LeadActivity::create([
-            'lead_id' => $lead->id,
-            'user_id' => $request->user()->id,
-            'type' => 'status_changed',
-            'description' => "Estado cambiado de {$previousLabel} a {$nextLabel}.",
-            'metadata' => ['from' => $previous, 'to' => $validated['status']],
-        ]);
-        $this->publishLeadEvent($lead->fresh('candidate'), 'lead.status_changed', [
+        $activity = $lead->candidate
+            ? CandidateActivity::create([
+                'candidate_id' => $lead->candidate->id,
+                'user_id' => $request->user()->id,
+                'type' => 'status_changed',
+                'description' => "Estado cambiado de {$previousLabel} a {$nextLabel}.",
+                'metadata' => ['from' => $previous, 'to' => $validated['status']],
+            ])
+            : LeadActivity::create([
+                'lead_id' => $lead->id,
+                'user_id' => $request->user()->id,
+                'type' => 'status_changed',
+                'description' => "Estado cambiado de {$previousLabel} a {$nextLabel}.",
+                'metadata' => ['from' => $previous, 'to' => $validated['status']],
+            ]);
+        $this->publishLeadEvent($lead->fresh('candidate'), $lead->candidate ? 'candidate.status_changed' : 'lead.status_changed', [
             'activity' => ['id' => $activity->id, 'description' => $activity->description, 'created_at' => $activity->created_at?->toIso8601String()],
             'notification' => ['title' => 'Etapa actualizada', 'description' => "{$lead->full_name}: {$nextLabel}."],
         ]);
 
         if ($discardTransition) {
             $discardMail->send($lead->fresh('candidate'), $previous ?: LeadStatus::NEW->value);
+        }
+
+        if ($lead->candidate && $validated['status'] === CandidateStatus::ADMITTED->value && $previous !== CandidateStatus::ADMITTED->value) {
+            $admittedMail->send($lead->fresh('candidate'));
         }
 
         return back()->with('success', 'Estado actualizado correctamente.');
@@ -831,9 +880,330 @@ class RecruitmentController extends Controller
         return Inertia::render('Admin/Recruitment/Candidates/Index', ['candidates' => $query->paginate(15)->withQueryString(), 'filters' => $request->only('search', 'type', 'status')]);
     }
 
+    public function monitorModels(Request $request): Response
+    {
+        if ($this->monitorIsInTraining($request)) {
+            $search = $request->string('search')->trim()->lower()->value();
+            $models = TrainingRecord::query()->where('type', 'model')->whereNull('owner_user_id')->get()->map(fn (TrainingRecord $record) => $this->trainingModelPayload($record))->filter(function (array $model) use ($search) {
+                if (! $search) return true;
+                return Str::contains(Str::lower(implode(' ', [$model['lead']['first_name'], $model['lead']['last_name'], $model['lead']['email']])), $search);
+            })->values();
+
+            return Inertia::render('Admin/MonitorModels/Index', [
+                'models' => ['data' => $models, 'total' => $models->count(), 'links' => []],
+                'filters' => $request->only('search'),
+                'trainingMode' => true,
+            ]);
+        }
+
+        $query = Candidate::query()
+            ->with('lead')
+            ->where('candidate_type', CandidateType::MODEL)
+            ->whereIn('status', [
+                CandidateStatus::ADMITTED,
+                CandidateStatus::WAITING,
+                CandidateStatus::ONBOARDING,
+                CandidateStatus::CONTRACTING,
+                CandidateStatus::INDUCTION,
+                CandidateStatus::READY_TO_ACTIVATE,
+                CandidateStatus::ACTIVE,
+            ])
+            ->latest();
+
+        if ($search = $request->string('search')->trim()->value()) {
+            $query->whereHas('lead', fn ($lead) => $lead
+                ->where('first_name', 'like', "%{$search}%")
+                ->orWhere('last_name', 'like', "%{$search}%")
+                ->orWhere('email', 'like', "%{$search}%"));
+        }
+
+        return Inertia::render('Admin/MonitorModels/Index', [
+            'models' => $query->paginate(15)->withQueryString(),
+            'filters' => $request->only('search'),
+        ]);
+    }
+
+    public function monitorModel(Request $request, int $candidate): Response
+    {
+        if ($this->monitorIsInTraining($request)) {
+            $record = TrainingRecord::query()->where('type', 'model')->whereNull('owner_user_id')->findOrFail($candidate);
+
+            return Inertia::render('Admin/MonitorModels/Show', [
+                'model' => $this->trainingModelPayload($record),
+                'trainingMode' => true,
+            ]);
+        }
+
+        $candidate = Candidate::findOrFail($candidate);
+        abort_unless(
+            $candidate->candidate_type === CandidateType::MODEL
+                && ! in_array($candidate->status, [CandidateStatus::DISCARDED, CandidateStatus::WITHDRAWN], true),
+            404,
+        );
+
+        return Inertia::render('Admin/MonitorModels/Show', [
+            'model' => $candidate->load('lead'),
+        ]);
+    }
+
+    private function monitorIsInTraining(Request $request): bool
+    {
+        return $request->user()?->hasRole('monitor') && $request->user()->candidate?->status !== CandidateStatus::ACTIVE;
+    }
+
+    private function trainingModelPayload(TrainingRecord $record): array
+    {
+        $payload = $record->payload;
+
+        return [
+            'id' => $record->id,
+            'code' => $payload['code'] ?? $record->record_key,
+            'status' => 'INDUCTION',
+            'training' => true,
+            'lead' => [
+                'first_name' => $payload['first_name'] ?? $payload['name'] ?? 'Modelo',
+                'last_name' => $payload['last_name'] ?? 'de prueba',
+                'email' => $payload['email'] ?? 'modelo.prueba@thevelvet.test',
+                'phone' => $payload['phone'] ?? '+57 300 000 0000',
+                'city' => $payload['city'] ?? 'Bogotá',
+                'country' => $payload['country'] ?? 'Colombia',
+                'birth_date' => $payload['birth_date'] ?? '2000-01-15',
+                'availability' => $payload['availability'] ?? 'Tiempo completo',
+            ],
+        ];
+    }
+
     public function candidate(Candidate $candidate): Response
     {
-        return Inertia::render('Admin/Recruitment/Candidates/Show', ['candidate' => $candidate->load(['lead', 'activities.user', 'interviews.slot'])]);
+        return Inertia::render('Admin/Recruitment/Candidates/Show', ['candidate' => $candidate->load(['lead.documents', 'user', 'activities.user', 'interviews.slot'])]);
+    }
+
+    public function startContracting(Request $request, Candidate $candidate): RedirectResponse
+    {
+        $candidate->loadMissing('lead');
+        if ($candidate->status !== CandidateStatus::ADMITTED) {
+            return back()->withErrors(['contracting' => 'El candidato debe estar admitido antes de iniciar la contratación.']);
+        }
+
+        $candidate->update(['status' => CandidateStatus::WAITING]);
+        $activity = CandidateActivity::create([
+            'candidate_id' => $candidate->id,
+            'user_id' => $request->user()->id,
+            'type' => 'contracting_started',
+            'description' => 'Se inició la contratación y se enviaron los requisitos documentales. El candidato pasó a En espera.',
+            'metadata' => ['from' => CandidateStatus::ADMITTED->value, 'to' => CandidateStatus::WAITING->value],
+        ]);
+
+        $this->publishLeadEvent($candidate->lead, 'candidate.status_changed', [
+            'candidate_id' => $candidate->id,
+            'status' => CandidateStatus::WAITING->value,
+            'activity' => $activity->only(['id', 'description', 'created_at']),
+            'notification' => ['title' => 'Contratación iniciada', 'description' => "Se enviaron los requisitos de contratación a {$candidate->lead->full_name}."],
+        ]);
+
+        try {
+            $uploadUrl = URL::temporarySignedRoute('contracting.documents.show', now()->addDays(7), [
+                'candidate' => $candidate->id,
+                'token' => Str::random(40),
+            ]);
+            Mail::to($candidate->lead->email)->send(new ContractingRequirementsMail($candidate, $uploadUrl));
+        } catch (\Throwable $exception) {
+            report($exception);
+            return back()->withErrors(['contracting' => 'El estado se actualizó, pero no fue posible enviar el correo. Revisa la configuración de correo.']);
+        }
+
+        return back()->with('success', 'Contratación iniciada. Se enviaron los requisitos al correo registrado.');
+    }
+
+    public function activateCandidateAccess(Request $request, Candidate $candidate): RedirectResponse
+    {
+        [$candidate, $activity, $temporaryPassword] = DB::transaction(function () use ($candidate, $request): array {
+            $candidate = Candidate::query()->with('lead')->lockForUpdate()->findOrFail($candidate->id);
+
+            if ($candidate->status !== CandidateStatus::ONBOARDING) {
+                throw ValidationException::withMessages(['access' => 'El candidato debe completar el onboarding antes de activar su acceso.']);
+            }
+
+            $roleSlug = $candidate->candidate_type === CandidateType::MONITOR ? 'monitor' : 'model';
+            $temporaryPassword = Str::random(5) . '-' . Str::random(5);
+            $user = $candidate->user_id
+                ? User::query()->lockForUpdate()->findOrFail($candidate->user_id)
+                : User::query()->where('email', $candidate->lead->email)->lockForUpdate()->first();
+
+            if (! $candidate->user_id && $user) {
+                throw ValidationException::withMessages(['access' => 'Ya existe una cuenta con el correo del candidato. Revísala antes de vincular el acceso.']);
+            }
+
+            if (! $user) {
+                $user = User::create([
+                    'name' => $candidate->lead->full_name,
+                    'email' => $candidate->lead->email,
+                    'password' => Hash::make($temporaryPassword),
+                    'is_active' => true,
+                ]);
+            } else {
+                $user->update([
+                    'name' => $candidate->lead->full_name,
+                    'email' => $candidate->lead->email,
+                    'password' => Hash::make($temporaryPassword),
+                    'is_active' => true,
+                ]);
+            }
+
+            $user->syncRoles([$roleSlug]);
+            $candidate->update([
+                'user_id' => $user->id,
+                'status' => CandidateStatus::ONBOARDING,
+            ]);
+
+            $activity = CandidateActivity::create([
+                'candidate_id' => $candidate->id,
+                'user_id' => $request->user()->id,
+                'type' => 'access_created',
+                'description' => 'Acceso al dashboard activado. El candidato pasó a Activo.',
+                'metadata' => ['user_id' => $user->id, 'role' => $roleSlug],
+            ]);
+
+            $activity->update(['description' => 'Acceso al dashboard creado. Se enviaron credenciales temporales; el primer ingreso iniciará la inducción.']);
+
+            return [$candidate->fresh(['lead', 'user']), $activity, $temporaryPassword];
+        });
+
+        if ($candidate->user && ! $candidate->user->hasVerifiedEmail()) {
+            try {
+                $candidate->user->sendEmailVerificationNotification();
+            } catch (\Throwable $exception) {
+                report($exception);
+            }
+        }
+
+        try {
+            Mail::to($candidate->lead->email)->send(new CandidateAccessCredentialsMail($candidate, $temporaryPassword));
+        } catch (\Throwable $exception) {
+            report($exception);
+            return back()->withErrors(['access' => 'El acceso fue creado, pero no fue posible enviar las credenciales. Revisa la configuración de correo.']);
+        }
+
+        $this->publishLeadEvent($candidate->lead, 'candidate.status_changed', [
+            'candidate_id' => $candidate->id,
+            'status' => $candidate->status->value,
+            'access_created' => true,
+            'activity' => $activity->only(['id', 'description', 'created_at']),
+            'notification' => ['title' => 'Credenciales enviadas', 'description' => "Se enviaron las credenciales a {$candidate->lead->full_name}."],
+        ]);
+
+        return to_route('admin.candidates.show', $candidate)->with('success', 'Acceso creado. Se enviaron credenciales temporales; el primer ingreso lo pasará a inducción.');
+    }
+
+    public function updateCandidateAccessStatus(Request $request, Candidate $candidate): RedirectResponse
+    {
+        $validated = $request->validate(['active' => ['required', 'boolean']]);
+        $candidate->loadMissing(['lead', 'user']);
+
+        if ($candidate->status !== CandidateStatus::ACTIVE || ! $candidate->user) {
+            return back()->withErrors(['access' => 'Solo puedes cambiar el acceso de un perfil activo con cuenta creada.']);
+        }
+
+        $active = (bool) $validated['active'];
+        $candidate->user->update(['is_active' => $active]);
+        $activity = CandidateActivity::create([
+            'candidate_id' => $candidate->id,
+            'user_id' => $request->user()->id,
+            'type' => $active ? 'access_reactivated' : 'access_deactivated',
+            'description' => $active ? 'El acceso operativo del perfil fue reactivado por administración.' : 'El acceso operativo del perfil fue desactivado por administración.',
+            'metadata' => ['user_id' => $candidate->user->id, 'active' => $active],
+        ]);
+
+        $this->publishLeadEvent($candidate->lead, 'candidate.access_status_changed', [
+            'candidate_id' => $candidate->id,
+            'active' => $active,
+            'activity' => $activity->only(['id', 'description', 'created_at']),
+            'notification' => ['title' => $active ? 'Perfil reactivado' : 'Perfil desactivado', 'description' => "El acceso de {$candidate->lead->full_name} fue " . ($active ? 'reactivado.' : 'desactivado.')],
+        ]);
+
+        return back()->with('success', $active ? 'Perfil reactivado correctamente.' : 'Perfil desactivado correctamente.');
+    }
+
+    public function uploadInterviewNotes(Request $request, Candidate $candidate): RedirectResponse
+    {
+        $validated = $request->validate([
+            'interview_notes' => ['required', 'file', 'mimes:pdf', 'mimetypes:application/pdf', 'max:10240'],
+        ]);
+
+        if ($candidate->status !== CandidateStatus::INTERVIEW) {
+            throw ValidationException::withMessages(['interview_notes' => 'Las anotaciones solo se pueden cargar durante la etapa de entrevista.']);
+        }
+
+        $document = $validated['interview_notes'];
+        $storedPath = $document->store('lead-documents/interviews', 'local');
+
+        try {
+            $activity = DB::transaction(function () use ($request, $candidate, $document, $storedPath): CandidateActivity {
+                $candidate = Candidate::query()->lockForUpdate()->findOrFail($candidate->id);
+                if ($candidate->status !== CandidateStatus::INTERVIEW) {
+                    throw ValidationException::withMessages(['interview_notes' => 'El candidato ya no se encuentra en entrevista.']);
+                }
+
+                $savedDocument = LeadDocument::create([
+                    'lead_id' => $candidate->lead_id,
+                    'type' => 'interview_notes',
+                    'original_name' => $document->getClientOriginalName(),
+                    'path' => $storedPath,
+                    'mime_type' => $document->getMimeType(),
+                    'size' => $document->getSize(),
+                    'status' => 'COMPLETED',
+                ]);
+                $candidate->update(['status' => CandidateStatus::EVALUATION]);
+
+                return CandidateActivity::create([
+                    'candidate_id' => $candidate->id,
+                    'user_id' => $request->user()->id,
+                    'type' => 'interview_notes_uploaded',
+                    'description' => 'Anotaciones de entrevista cargadas. El candidato pasó automáticamente a evaluación.',
+                    'metadata' => ['document_id' => $savedDocument->id, 'original_name' => $savedDocument->original_name],
+                ]);
+            });
+        } catch (\Throwable $exception) {
+            Storage::disk('local')->delete($storedPath);
+            throw $exception;
+        }
+
+        $candidate->load('lead');
+        $this->publishLeadEvent($candidate->lead->fresh('candidate'), 'candidate.status_changed', [
+            'candidate_id' => $candidate->id,
+            'status' => CandidateStatus::EVALUATION->value,
+            'document_uploaded' => true,
+            'activity' => $activity->only(['id', 'description', 'created_at']),
+            'notification' => ['title' => 'Anotaciones de entrevista cargadas', 'description' => "{$candidate->lead->full_name} pasó automáticamente a evaluación."],
+        ]);
+
+        return back()->with('success', 'Anotaciones cargadas. El candidato pasó a evaluación.');
+    }
+
+    public function downloadInterviewNotes(Request $request, Candidate $candidate)
+    {
+        $document = $this->interviewNotesDocument($candidate);
+
+        return Storage::disk('local')->download($document->path, $document->original_name, ['Content-Type' => 'application/pdf']);
+    }
+
+    public function previewInterviewNotes(Request $request, Candidate $candidate)
+    {
+        $document = $this->interviewNotesDocument($candidate);
+        $filename = addslashes($document->original_name ?: 'anotaciones-entrevista.pdf');
+
+        return response()->file(Storage::disk('local')->path($document->path), [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => "inline; filename=\"{$filename}\"",
+        ]);
+    }
+
+    private function interviewNotesDocument(Candidate $candidate): LeadDocument
+    {
+        $document = $candidate->load('lead.documents')->lead->documents()->where('type', 'interview_notes')->latest()->firstOrFail();
+        abort_unless(Storage::disk('local')->exists($document->path), 404);
+
+        return $document;
     }
 
     public function updateCandidate(Request $request, Candidate $candidate): RedirectResponse
@@ -886,8 +1256,9 @@ class RecruitmentController extends Controller
         return to_route('admin.candidates.show', $candidate)->with('success', 'Candidato descartado correctamente.');
     }
 
-    public function updateCandidateStatus(Request $request, Candidate $candidate, InterviewInvitationService $invitationService, ApplicationDiscardMailService $discardMail): RedirectResponse
+    public function updateCandidateStatus(Request $request, Candidate $candidate, InterviewInvitationService $invitationService, ApplicationDiscardMailService $discardMail, AdmittedMailService $admittedMail): RedirectResponse
     {
+        $candidate->loadMissing('user');
         $validated = $request->validate(['status' => ['required', Rule::in(array_column(CandidateStatus::cases(), 'value'))]]);
         $nextStatus = CandidateStatus::from($validated['status']);
         $previousStatus = $candidate->status;
@@ -897,8 +1268,32 @@ class RecruitmentController extends Controller
             return back()->withErrors(['status' => 'Usa la opción “Descartar” e indica el motivo.']);
         }
 
+        if ($nextStatus === CandidateStatus::EVALUATION && $previousStatus === CandidateStatus::INTERVIEW && ! $candidate->lead->documents()->where('type', 'interview_notes')->exists()) {
+            return back()->withErrors(['status' => 'Carga primero el PDF con las anotaciones de la entrevista.']);
+        }
+
         if ($nextStatus === CandidateStatus::ADMITTED && ! $this->identityVerificationIsApproved($candidate)) {
             return back()->withErrors(['status' => 'La candidata debe tener la identidad verificada y la mayoría de edad confirmada antes de ser admitida.']);
+        }
+
+        if ($nextStatus === CandidateStatus::ADMITTED && $previousStatus !== CandidateStatus::EVALUATION) {
+            return back()->withErrors(['status' => 'El candidato debe estar en evaluación antes de ser admitido.']);
+        }
+
+        if ($nextStatus === CandidateStatus::WAITING && $previousStatus === CandidateStatus::ADMITTED) {
+            return back()->withErrors(['status' => 'Inicia la contratacion desde la accion recomendada para enviar los requisitos por correo.']);
+        }
+
+        if ($nextStatus === CandidateStatus::CONTRACTING && $previousStatus !== CandidateStatus::WAITING) {
+            return back()->withErrors(['status' => 'El candidato debe estar admitido antes de iniciar la contratación.']);
+        }
+
+        if ($nextStatus === CandidateStatus::ONBOARDING && $previousStatus !== CandidateStatus::CONTRACTING) {
+            return back()->withErrors(['status' => 'El candidato debe completar la contratación antes de pasar a onboarding.']);
+        }
+
+        if ($nextStatus === CandidateStatus::ACTIVE && (! $candidate->user_id || ! $candidate->user?->is_active)) {
+            return back()->withErrors(['status' => 'Activa primero el acceso al dashboard desde el panel administrativo.']);
         }
 
         if ($previousStatus === $nextStatus) {
@@ -932,10 +1327,6 @@ class RecruitmentController extends Controller
         if ($discardTransition) {
             $attributes['discard_reason'] = $request->string('reason')->trim()->value();
         }
-        if ($nextStatus === CandidateStatus::CONTRACTING && ! $candidate->contracted_at) {
-            $attributes['contracted_at'] = now();
-        }
-
         $candidate->update($attributes);
         $activity = CandidateActivity::create([
             'candidate_id' => $candidate->id,
@@ -949,6 +1340,19 @@ class RecruitmentController extends Controller
 
         if ($discardTransition) {
             $discardMail->send($candidate->lead, $previousStatus?->value ?: CandidateStatus::NEW->value);
+        }
+
+        if ($nextStatus === CandidateStatus::ADMITTED && $previousStatus !== CandidateStatus::ADMITTED) {
+            $admittedMail->send($candidate->lead);
+        }
+
+        if ($nextStatus === CandidateStatus::ACTIVE && $previousStatus !== CandidateStatus::ACTIVE) {
+            try {
+                Mail::to($candidate->lead->email)->send(new CandidateActivatedMail($candidate));
+            } catch (\Throwable $exception) {
+                report($exception);
+                return back()->withErrors(['status' => 'El perfil fue activado, pero no fue posible enviar el correo de confirmación. Revisa la configuración de correo.']);
+            }
         }
 
         return back()->with('success', "Estado actualizado a {$nextStatus->label()}.");
@@ -996,6 +1400,7 @@ class RecruitmentController extends Controller
             'city' => ['required', 'string', 'max:100'],
             'birth_date' => ['nullable', 'required_if:candidate_type,MODEL', 'date', 'before_or_equal:' . now()->subYears(18)->toDateString()],
             'experience' => ['nullable', 'string', 'max:5000'],
+            'experience_years' => [Rule::requiredIf(fn () => $this->input('candidate_type') === 'MONITOR'), 'nullable', Rule::in(['1', '2', '3_PLUS'])],
             'speaks_english' => ['sometimes', 'boolean'],
             'english_level' => [Rule::requiredIf(fn () => $this->boolean('speaks_english')), 'nullable', Rule::in(['A1', 'A2', 'B1', 'B2', 'C1', 'C2', 'NATIVE'])],
             'motivation' => ['nullable', 'string', 'max:5000'],

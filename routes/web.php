@@ -8,8 +8,13 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\RecruitmentController;
 use App\Http\Controllers\InterviewController;
 use App\Http\Controllers\CalendarController;
+use App\Http\Controllers\ContractingController;
 use App\Http\Controllers\UserAccessController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\RoomController;
+use App\Http\Controllers\PortalRoomController;
+use App\Http\Controllers\DocumentsController;
+use App\Http\Controllers\TrainingDataController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -28,19 +33,52 @@ Route::post('/prequalification/{candidate}/{token}/identity-session', [Recruitme
 Route::post('/webhooks/didit', [RecruitmentController::class, 'diditWebhook'])->name('didit.webhook');
 Route::get('/entrevista/{interview}/{token}', [InterviewController::class, 'booking'])->middleware('signed')->name('interview.booking.show');
 Route::post('/entrevista/{interview}/{token}', [InterviewController::class, 'book'])->middleware(['signed', 'throttle:10,1'])->name('interview.booking.book');
+Route::get('/contratacion/{candidate}/{token}/documentos', [ContractingController::class, 'publicDocuments'])->middleware('signed')->name('contracting.documents.show');
+Route::post('/contratacion/{candidate}/{token}/documentos', [ContractingController::class, 'storePublicDocuments'])->middleware(['signed', 'throttle:10,1'])->name('contracting.documents.store');
 Route::post('/cookie-consent', [CookieConsentController::class, 'store'])->middleware('throttle:20,1')->name('cookie-consent.store');
 
 Route::get('/dashboard', function () {
+    if (request()->user()->hasRole('model')) {
+        return to_route('model.dashboard');
+    }
+    if (request()->user()->hasRole('monitor')) {
+        return to_route('monitor.dashboard');
+    }
+
     return to_route('admin.recruitment');
 })->middleware(['auth', 'verified'])->name('dashboard');
 
 Route::middleware('auth')->group(function () {
+    Route::middleware(['permission:rooms.view_own', 'active.profile'])->prefix('model')->name('model.')->group(function () {
+        Route::get('/dashboard', [PortalRoomController::class, 'modelDashboard'])->name('dashboard');
+        Route::post('/rooms/reservations', [PortalRoomController::class, 'storeModelReservation'])->middleware(['permission:rooms.reserve_own', 'active.profile'])->name('rooms.reservations.store');
+        Route::patch('/rooms/reservations/{reservation}/status', [PortalRoomController::class, 'updateModelReservationStatus'])->middleware(['permission:rooms.use_own', 'active.profile'])->name('rooms.reservations.status.update');
+    });
+    Route::middleware(['permission:rooms.view_team', 'active.profile'])->prefix('monitor')->name('monitor.')->group(function () {
+        Route::get('/dashboard', [PortalRoomController::class, 'monitorDashboard'])->name('dashboard');
+        Route::get('/rooms', [PortalRoomController::class, 'monitorRooms'])->name('rooms');
+        Route::post('/rooms/reservations', [PortalRoomController::class, 'storeMonitorReservation'])->middleware(['permission:rooms.manage_reservations', 'active.profile'])->name('rooms.reservations.store');
+        Route::patch('/rooms/reservations/{reservation}/status', [PortalRoomController::class, 'updateMonitorReservationStatus'])->middleware(['permission:rooms.manage_usage', 'active.profile'])->name('rooms.reservations.status.update');
+    });
+    Route::middleware(['permission:models.view_assigned', 'active.profile'])->prefix('monitor/models')->name('monitor.models.')->group(function () {
+        Route::get('/', [RecruitmentController::class, 'monitorModels'])->name('index');
+        Route::get('/{candidate}', [RecruitmentController::class, 'monitorModel'])->name('show');
+    });
+    Route::get('/realtime/token', [PortalRoomController::class, 'realtimeToken'])->name('realtime.token');
+    Route::middleware('permission:documents.view_own')->prefix('portal/documents')->name('portal.documents.')->group(function () {
+        Route::get('/{document}/preview', [PortalRoomController::class, 'previewContractDocument'])->name('preview');
+        Route::get('/{document}/download', [PortalRoomController::class, 'downloadContractDocument'])->name('download');
+    });
     Route::prefix('admin')->name('admin.')->group(function () {
         Route::middleware('permission:dashboard.view')->group(function () {
             Route::get('/', [RecruitmentController::class, 'dashboard'])->name('dashboard');
             Route::get('/recruitment', [RecruitmentController::class, 'dashboard'])->name('recruitment');
         });
         Route::get('/workflows', [RecruitmentController::class, 'workflows'])->middleware('permission:settings.manage')->name('workflows');
+        Route::middleware('permission:settings.manage')->group(function () {
+            Route::get('/training-data', [TrainingDataController::class, 'index'])->name('training-data.index');
+            Route::post('/training-data/reset', [TrainingDataController::class, 'reset'])->name('training-data.reset');
+        });
         Route::get('/processes', [RecruitmentController::class, 'processes'])->middleware('permission:onboarding.view')->name('processes');
         Route::middleware('permission:leads.view')->group(function () {
             Route::get('/leads', [RecruitmentController::class, 'leads'])->name('leads');
@@ -60,17 +98,48 @@ Route::middleware('auth')->group(function () {
             Route::get('/candidates/{candidate}', [RecruitmentController::class, 'candidate'])->name('candidates.show');
         });
         Route::put('/candidates/{candidate}', [RecruitmentController::class, 'updateCandidate'])->middleware('permission:candidates.update')->name('candidates.update');
+        Route::post('/candidates/{candidate}/activate-access', [RecruitmentController::class, 'activateCandidateAccess'])->middleware('permission:candidates.activate_access')->name('candidates.activate-access');
+        Route::patch('/candidates/{candidate}/access-status', [RecruitmentController::class, 'updateCandidateAccessStatus'])->middleware('permission:candidates.activate_access')->name('candidates.access-status');
+        Route::post('/candidates/{candidate}/start-contracting', [RecruitmentController::class, 'startContracting'])->middleware('permission:contracts.create')->name('candidates.start-contracting');
+        Route::post('/candidates/{candidate}/interview-notes', [RecruitmentController::class, 'uploadInterviewNotes'])->middleware('permission:candidates.update')->name('candidates.interview-notes.upload');
+        Route::get('/candidates/{candidate}/interview-notes', [RecruitmentController::class, 'downloadInterviewNotes'])->middleware('permission:candidates.view')->name('candidates.interview-notes.download');
+        Route::get('/candidates/{candidate}/interview-notes/preview', [RecruitmentController::class, 'previewInterviewNotes'])->middleware('permission:candidates.view')->name('candidates.interview-notes.preview');
+        Route::get('/candidates/{candidate}/interview-notes/download', [RecruitmentController::class, 'downloadInterviewNotes'])->middleware('permission:candidates.view')->name('candidates.interview-notes.download.file');
         Route::post('/candidates/{candidate}/discard', [RecruitmentController::class, 'discardCandidate'])->middleware('permission:candidates.reject')->name('candidates.discard');
         Route::patch('/candidates/{candidate}/status', [RecruitmentController::class, 'updateCandidateStatus'])->middleware('permission:candidates.change_status')->name('candidates.status.update');
         Route::post('/candidates/{candidate}/prequalification', [RecruitmentController::class, 'sendPrequalification'])->middleware('permission:candidates.request_documents')->name('candidates.prequalification.send');
+        Route::middleware('permission:contracts.create')->prefix('contracting')->name('contracting.')->group(function () {
+            Route::get('/', [ContractingController::class, 'index'])->name('index');
+            Route::post('/slots', [ContractingController::class, 'generateSlots'])->name('slots.generate');
+            Route::delete('/slots', [ContractingController::class, 'destroyAvailableSlots'])->name('slots.destroy-available');
+            Route::post('/appointments', [ContractingController::class, 'book'])->name('appointments.store');
+            Route::patch('/appointments/{appointment}/reschedule', [ContractingController::class, 'reschedule'])->name('appointments.reschedule');
+            Route::patch('/appointments/{appointment}/complete', [ContractingController::class, 'complete'])->name('appointments.complete');
+            Route::post('/candidates/{candidate}/documents', [ContractingController::class, 'uploadDocuments'])->name('candidates.documents.store');
+        });
         Route::middleware('permission:interviews.view')->group(function () {
             Route::get('/interviews', [InterviewController::class, 'index'])->name('interviews.index');
         });
         Route::middleware('permission:documents.verify')->group(function () {
             Route::get('/validations', [RecruitmentController::class, 'validations'])->name('validations');
         });
+        Route::middleware('permission:documents.view')->prefix('documents')->name('documents.')->group(function () {
+            Route::get('/', [DocumentsController::class, 'index'])->name('index');
+            Route::patch('/people/{lead}/status', [DocumentsController::class, 'updatePersonStatus'])->middleware('permission:documents.manage')->name('people.status.update');
+            Route::get('/{document}/preview', [DocumentsController::class, 'preview'])->name('preview');
+            Route::get('/{document}/download', [DocumentsController::class, 'download'])->name('download');
+            Route::patch('/{document}/status', [DocumentsController::class, 'updateStatus'])->middleware('permission:documents.manage')->name('status.update');
+        });
         Route::middleware('permission:calendar.view')->group(function () {
             Route::get('/calendar', [CalendarController::class, 'index'])->name('calendar');
+        });
+        Route::middleware('permission:rooms.view')->group(function () {
+            Route::get('/rooms', [RoomController::class, 'index'])->name('rooms.index');
+            Route::post('/rooms', [RoomController::class, 'store'])->name('rooms.store');
+            Route::patch('/rooms/{room}', [RoomController::class, 'update'])->name('rooms.update');
+            Route::patch('/rooms/{room}/status', [RoomController::class, 'updateStatus'])->name('rooms.status.update');
+            Route::post('/rooms/reservations', [RoomController::class, 'storeReservation'])->name('rooms.reservations.store');
+            Route::patch('/rooms/reservations/{reservation}/status', [RoomController::class, 'updateReservationStatus'])->name('rooms.reservations.status.update');
         });
         Route::middleware('permission:calendar.manage')->group(function () {
             Route::post('/calendar/events', [CalendarController::class, 'store'])->name('calendar.events.store');

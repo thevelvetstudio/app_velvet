@@ -5,6 +5,7 @@ import { FiArrowLeft, FiCheckCircle, FiClock, FiEdit3, FiMail, FiTrash2, FiUser,
 import { formatFriendlyDate, formatFriendlyDateTime } from '../../../../lib/date';
 import { candidateTypeLabels } from '../../../../lib/recruitmentLabels';
 import AdminApplicationEditModal from '../../../../Components/AdminApplicationEditModal';
+import InterviewNotesUpload from '../../../../Components/InterviewNotesUpload';
 import Layout from '../Layout';
 import { subscribeToRealtime } from '../../../../lib/ably';
 
@@ -47,6 +48,7 @@ export default function Show({ lead }) {
         statusForm.patch(`/admin/leads/${lead.id}/status`, { preserveScroll: true, onError: () => setPipelineStatus(lead.pipeline_status) });
     };
     const convertAction = () => form.post(`/admin/leads/${lead.id}/convert`);
+    const startContractingAction = (candidateId) => form.post(`/admin/candidates/${candidateId}/start-contracting`, { preserveScroll: true });
     const applicationName = [lead.first_name, lead.last_name].filter(Boolean).join(' ') || lead.full_name || 'Sin nombre';
     const applicationWhatsapp = String(lead.phone || '').replace(/\D/g, '');
     const applicationWhatsappHref = applicationWhatsapp ? `https://wa.me/${applicationWhatsapp.startsWith('57') ? applicationWhatsapp : `57${applicationWhatsapp}`}?text=${encodeURIComponent(`Hola ${applicationName}, te escribe el equipo de The Velvet Studio. Recibimos tu solicitud ${lead.code} y queremos contarte los siguientes pasos.`)}` : null;
@@ -69,6 +71,24 @@ export default function Show({ lead }) {
             description: 'Consulta las invitaciones y el resultado de la entrevista antes de avanzar a evaluación.',
             label: 'Revisar entrevistas',
             href: '/admin/interviews',
+        };
+        if (candidateId && pipelineStatus === 'EVALUATION') return {
+            title: 'Admitir candidato',
+            description: 'La evaluación de la entrevista está lista. Confirma la admisión para que la persona avance y reciba el correo de felicitación con las instrucciones de contacto.',
+            label: 'Marcar como admitido',
+            action: () => changeStatus('ADMITTED'),
+        };
+        if (candidateId && pipelineStatus === 'ADMITTED') return {
+            title: 'Iniciar contratación',
+            description: 'Contacta a la persona, envía la documentación necesaria y pásala a En espera para programar la contratación física.',
+            label: 'Contactar y enviar requisitos',
+            action: () => startContractingAction(candidateId),
+        };
+        if (candidateId && ['ONBOARDING', 'READY_TO_ACTIVATE'].includes(pipelineStatus)) return {
+            title: 'Activar acceso al dashboard',
+            description: 'El onboarding está listo. Abre el perfil del candidato para crear sus credenciales y finalizar el proceso con el estado Activo.',
+            label: 'Abrir perfil y activar acceso',
+            href: `/admin/candidates/${candidateId}`,
         };
         if (!candidateId && pipelineStatus === 'NEW') return {
             title: 'Contactar al lead',
@@ -119,7 +139,8 @@ export default function Show({ lead }) {
                         <dl className="mt-7 grid gap-x-8 gap-y-7 sm:grid-cols-2">
                             <Detail label="Nombre completo" value={fullName} /><Detail label="Sexo" value={sexLabels[lead.sex] || lead.sex} /><Detail label="Email" value={lead.email} /><Detail label="WhatsApp" value={lead.phone} /><Detail label="Ciudad" value={lead.city} /><Detail label="País" value={lead.country} /><Detail label="Fecha de nacimiento" value={birthDate} /><Detail label="Habla inglés" value={lead.speaks_english ? 'Sí' : 'No'} /><Detail label="Nivel de inglés" value={lead.speaks_english ? lead.english_level : 'No aplica'} /><Detail label="Fuente" value={lead.source} /><Detail label="Fecha de solicitud" value={formatFriendlyDateTime(lead.created_at)} /><Detail label="Disponibilidad" value={lead.availability} /><Detail label="Modalidad" value={lead.work_mode} />
                         </dl>
-                        {lead.experience && <div className="mt-8 border-t border-[#292d39] pt-7"><p className="text-[10px] uppercase tracking-[.18em] text-[#7f8495]">Experiencia</p><p className="mt-3 whitespace-pre-line text-sm leading-7 text-[#c3c6d1]">{lead.experience}</p></div>}
+                        {lead.candidate_type === 'MONITOR' && <div className="mt-8 border-t border-[#292d39] pt-7"><p className="text-[10px] uppercase tracking-[.18em] text-[#7f8495]">Años de experiencia</p><p className="mt-3 text-sm text-[#c3c6d1]">{({ 1: '1 año', 2: '2 años', '3_PLUS': '3 años o más' }[lead.experience_years] || 'No indicado')}</p></div>}
+                        {lead.experience && <div className="mt-8 border-t border-[#292d39] pt-7"><p className="text-[10px] uppercase tracking-[.18em] text-[#7f8495]">Experiencia demostrable</p><p className="mt-3 whitespace-pre-line text-sm leading-7 text-[#c3c6d1]">{lead.experience}</p></div>}
                         {lead.motivation && <div className="mt-8 border-t border-[#292d39] pt-7"><p className="text-[10px] uppercase tracking-[.18em] text-[#7f8495]">Motivación</p><p className="mt-3 whitespace-pre-line text-sm leading-7 text-[#c3c6d1]">{lead.motivation}</p></div>}
                         {lead.discard_reason && <div className="mt-8 border-t border-[#292d39] pt-7"><p className="text-[10px] uppercase tracking-[.18em] text-[#7f8495]">Motivo del descarte</p><p className="mt-3 rounded-lg border border-[#673344] bg-[#321622]/50 px-3 py-2 text-sm leading-6 text-[#ffb1bd]">{lead.discard_reason}</p></div>}
                         <div className="mt-8 border-t border-[#292d39] pt-7">{lead.candidate ? <p className="inline-flex items-center gap-2 text-sm text-[#8ff0bd]"><FiCheckCircle /> Convertido a candidato  ·  {lead.candidate.code}</p> : lead.status === 'DISCARDED' ? <p className="inline-flex items-center gap-2 text-sm text-[#ffb1bd]"><FiTrash2 /> Lead descartado</p> : <button type="button" onClick={convert} disabled={form.processing} className="velvet-button">{form.processing ? 'Convirtiendo…' : 'Convertir en candidato →'}</button>}</div>
@@ -128,6 +149,7 @@ export default function Show({ lead }) {
                         <div className="flex items-center gap-3"><span className="grid h-9 w-9 place-items-center rounded-full bg-[#3c1749] text-[#e2a0f1]"><FiClock size={16} /></span><div><p className="text-sm font-medium text-white">Historial de la aplicación</p><p className="mt-1 text-xs text-[#7f8495]">Actividad registrada</p></div></div>
                         <div className="mt-7 space-y-6">{activities.length ? activities.map((activity) => <div key={activity.timeline_id || activity.id} className="relative border-l border-[#8b28ad] pl-5"><span className="absolute -left-[5px] top-0 h-2.5 w-2.5 rounded-full bg-[#c22be8] shadow-[0_0_12px_rgba(194,43,232,.65)]" /><p className="text-sm text-[#e6e1ea]">{activity.description}</p><p className="mt-1 text-xs text-[#7f8495]">{formatFriendlyDateTime(activity.created_at)}</p></div>) : <p className="text-sm text-[#7f8495]">Aún no hay actividad registrada.</p>}</div>
                         <div className="mt-8 border-t border-[#292d39] pt-6"><p className="text-[10px] uppercase tracking-[.18em] text-[#7f8495]">Contacto directo</p><div className="mt-4 space-y-3"><a href={emailHref || undefined} className={`flex items-center gap-3 rounded-lg border px-3 py-3 transition ${emailHref ? 'border-[#302c3c] bg-[#151622] hover:border-[#88429a] hover:bg-[#21172a]' : 'pointer-events-none border-[#262934] bg-[#12141c] opacity-50'}`}><span className="grid h-8 w-8 place-items-center rounded-full bg-[#3b1948] text-[#d56bea]"><FiMail size={15} /></span><span className="min-w-0"><strong className="block text-xs font-medium text-[#e7e1eb]">Enviar correo</strong><small className="mt-1 block text-[10px] text-[#7f8495]">{lead.email || 'Correo no indicado'}</small></span></a><a href={whatsappHref || undefined} target="_blank" rel="noreferrer" className={`flex items-center gap-3 rounded-lg border px-3 py-3 transition ${whatsappHref ? 'border-[#254b49] bg-[#122321] hover:border-[#36ae97] hover:bg-[#173d37]' : 'pointer-events-none border-[#262934] bg-[#12141c] opacity-50'}`}><span className="grid h-8 w-8 place-items-center rounded-full bg-[#16483f] text-[#8ee2ca]"><FaWhatsapp size={15} /></span><span className="min-w-0"><strong className="block text-xs font-medium text-[#e7e1eb]">Escribir por WhatsApp</strong><small className="mt-1 block text-[10px] text-[#7f8495]">{lead.phone || 'WhatsApp no indicado'}</small></span></a></div></div>
+                        <InterviewNotesUpload candidateId={lead.candidate?.id} status={pipelineStatus} documents={lead.documents || []} />
                     </aside>
                 </div>
             </div>

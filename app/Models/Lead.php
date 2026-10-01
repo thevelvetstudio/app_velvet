@@ -17,7 +17,7 @@ class Lead extends Model
 
     protected function casts(): array
     {
-        return ['birth_date' => 'date', 'status' => LeadStatus::class, 'candidate_type' => CandidateType::class];
+        return ['birth_date' => 'date', 'experience_years' => 'string', 'status' => LeadStatus::class, 'candidate_type' => CandidateType::class];
     }
 
     public function activities()

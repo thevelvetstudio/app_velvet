@@ -55,6 +55,7 @@ return [
             'leads' => env('ABLY_LEADS_CHANNEL', 'admin-leads'),
             'interviews' => env('ABLY_INTERVIEWS_CHANNEL', 'admin-interviews'),
             'onboarding' => env('ABLY_ONBOARDING_CHANNEL', 'admin-onboarding'),
+            'rooms' => env('ABLY_ROOMS_CHANNEL', 'admin-rooms'),
         ],
     ],
 
