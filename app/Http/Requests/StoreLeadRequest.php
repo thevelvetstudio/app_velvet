@@ -20,6 +20,7 @@ class StoreLeadRequest extends FormRequest
             'last_name' => ['required', 'string', 'max:100'], 'sex' => ['required', 'in:WOMAN,MAN'], 'phone' => ['required', 'string', 'max:40'],
             'email' => ['required', 'email', 'max:190'], 'country' => ['required', 'string', 'max:120'], 'city' => ['required', 'string', 'max:120'],
             'birth_date' => ['required', 'date', 'before_or_equal:'.now()->subYears(18)->toDateString()], 'experience' => ['required', 'string', 'max:5000'],
+            'experience_years' => ['nullable', 'required_if:candidate_type,MONITOR', Rule::in(['1', '2', '3_PLUS'])],
             'speaks_english' => ['required', 'boolean'], 'english_level' => [Rule::requiredIf(fn () => $this->boolean('speaks_english')), 'nullable', Rule::in(['A1', 'A2', 'B1', 'B2', 'C1', 'C2', 'NATIVE'])],
             'availability' => ['required', 'string', 'max:100'], 'work_mode' => ['required', 'string', 'max:100', 'in:En estudio'],
             'source' => ['nullable', 'string', 'max:100'], 'motivation' => ['nullable', 'string', 'max:5000'],

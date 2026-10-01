@@ -1,6 +1,6 @@
 import { Link, router, usePage } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
-import { FiBell, FiBriefcase, FiCalendar, FiChevronDown, FiClipboard, FiFileText, FiGrid, FiLogOut, FiMenu, FiSearch, FiSettings, FiSun, FiUser, FiUserCheck, FiUsers, FiX } from 'react-icons/fi';
+import { FiBell, FiBriefcase, FiCalendar, FiChevronDown, FiClipboard, FiDatabase, FiFileText, FiGrid, FiLogOut, FiMenu, FiSearch, FiSettings, FiSun, FiUser, FiUserCheck, FiUsers, FiX } from 'react-icons/fi';
 import BrandMark from '@/Components/BrandMark';
 import { useAuthorization } from '@/lib/authorization';
 import toast from 'react-hot-toast';
@@ -16,30 +16,42 @@ function notificationHref(item) {
 }
 
 const sections = [
-    { label: 'Reclutamiento', items: [['Leads', '/admin/leads', FiUsers], ['Candidatos', '/admin/candidates', FiUserCheck], ['Entrevistas', '/admin/interviews', FiCalendar], ['Calendario', '/admin/calendar', FiCalendar], ['Pipeline', '/admin/recruitment', FiGrid]] },
-    { label: 'Onboarding', items: [['Procesos', '/admin/processes', FiClipboard], ['Validaciones', '/admin/validations', FiFileText]] },
+    { label: 'Reclutamiento', items: [['Leads', '/admin/leads', FiUsers], ['Candidatos', '/admin/candidates', FiUserCheck], ['Entrevistas', '/admin/interviews', FiCalendar], ['Contratación', '/admin/contracting', FiBriefcase], ['Calendario', '/admin/calendar', FiCalendar], ['Pipeline', '/admin/recruitment', FiGrid]] },
+    { label: 'Onboarding', items: [['Procesos', '/admin/processes', FiClipboard], ['Validaciones', '/admin/validations', FiFileText], ['Documentos', '/admin/documents', FiFileText]] },
     { label: 'Personas', items: [['Modelos', '/admin/candidates?type=MODEL', FiUsers], ['Monitores', '/admin/candidates?type=MONITOR', FiBriefcase]] },
-    { label: 'Configuración', items: [['Workflows', '/admin/workflows', FiSettings], ['Usuarios', '/admin/users', FiUsers], ['Roles y permisos', '/admin/access', FiSettings]] },
+    { label: 'Operación', items: [['Rooms', '/admin/rooms', FiGrid]] },
+    { label: 'Configuración', items: [['Workflows', '/admin/workflows', FiSettings], ['Datos de prueba', '/admin/training-data', FiDatabase], ['Usuarios', '/admin/users', FiUsers], ['Roles y permisos', '/admin/access', FiSettings]] },
 ];
 
 function Wordmark() {
     return <BrandMark className="h-11 max-w-[164px]" />;
 }
 
+const portalSections = {
+    monitor: [{ label: 'Operación', items: [['Dashboard', '/monitor/dashboard', FiGrid]] }],
+    model: [{ label: 'Operación', items: [['Dashboard', '/model/dashboard', FiGrid]] }],
+};
+
 function isActive(label, url) {
+    if (label === 'Dashboard') return url === '/monitor/dashboard' || url === '/model/dashboard';
+    if (label === 'Modelos') return url === '/monitor/models' || url.startsWith('/monitor/models/');
     const [path, query = ''] = url.split('?');
     if (label === 'Modelos') return path === '/admin/candidates' && query.includes('type=MODEL');
     if (label === 'Monitores') return path === '/admin/candidates' && query.includes('type=MONITOR');
     if (label === 'Entrevistas') return path === '/admin/interviews';
+    if (label === 'Contratación') return path === '/admin/contracting';
     if (label === 'Calendario') return path === '/admin/calendar';
     if (label === 'Candidatos') return path === '/admin/candidates' && !query.includes('type=') && !query.includes('status=');
     if (label === 'Leads') return path === '/admin/leads' && !query.includes('status=NEW');
     if (label === 'Validaciones') return path === '/admin/validations';
+    if (label === 'Documentos') return path === '/admin/documents';
     if (label === 'Pipeline') return path === '/admin/recruitment' || path === '/admin';
     if (label === 'Procesos') return path === '/admin/processes';
     if (label === 'Usuarios') return path === '/admin/users';
     if (label === 'Roles y permisos') return path === '/admin/access';
     if (label === 'Workflows') return path === '/admin/workflows';
+    if (label === 'Datos de prueba') return path === '/admin/training-data';
+    if (label === 'Rooms') return path === '/admin/rooms' || path === '/monitor/rooms';
     return false;
 }
 
@@ -47,20 +59,42 @@ const requiredPermissions = {
     Leads: 'leads.view',
     Candidatos: 'candidates.view',
     Entrevistas: 'interviews.view',
+    Contratación: 'contracts.create',
     Calendario: 'calendar.view',
     Pipeline: 'dashboard.view',
     Procesos: 'onboarding.view',
     Validaciones: 'documents.verify',
+    Documentos: 'documents.view',
     Modelos: 'models.view_all',
     Monitores: 'models.view_all',
+    Rooms: 'rooms.view',
     Workflows: 'settings.manage',
+    'Datos de prueba': 'super_admin',
     Usuarios: 'users.view',
     'Roles y permisos': 'roles.view',
 };
 
 function Sidebar({ onClose, url, user, can }) {
+    const roleSlug = user?.roles?.[0]?.slug;
+    if (portalSections[roleSlug]) return <PortalSidebar onClose={onClose} url={url} user={user} can={can} roleSlug={roleSlug} />;
     const canLabel = (label) => can(requiredPermissions[label]);
     return <aside className="flex h-full w-[224px] flex-col border-r border-[#1f222d] bg-[#090a10] px-4 py-5"><div className="px-3"><Wordmark /></div><nav className="sidebar-scroll mt-8 flex-1 space-y-6 overflow-y-auto">{sections.map((section) => { const visibleItems = section.items.filter(([label]) => canLabel(label)); if (!visibleItems.length) return null; return <div key={section.label}><p className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-[.2em] text-[#8990a1]">{section.label}</p><div className="space-y-1">{visibleItems.map(([label, href, Icon]) => { const active = isActive(label, url); return <Link key={label} href={href} onClick={onClose} className={`group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition ${active ? 'bg-[#55166e] text-white shadow-[0_8px_22px_rgba(136,52,153,.22)]' : 'text-[#b9bac8] hover:bg-[#171522] hover:text-white'}`}><Icon size={17} strokeWidth={1.7} /><span>{label}</span>{active && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-[#e6a0f2]" />}</Link>; })}</div></div>; })}</nav><div className="mt-5 overflow-hidden rounded-lg border border-[#242632] bg-[#11121a]"><div className="relative h-32 overflow-hidden"><img src="/onboarding/modelo.webp" alt="" className="h-full w-full object-cover opacity-70" /><div className="absolute inset-0 bg-gradient-to-t from-[#11121a] via-[#351044]/25 to-transparent" /><p className="absolute bottom-3 left-3 right-3 font-editorial text-lg leading-none text-white">Talento real.<br />Historias más grandes.</p></div></div></aside>;
+}
+
+function PortalSidebar({ onClose, url, user, can, roleSlug }) {
+    if (roleSlug === 'monitor') return <GroupedPortalSidebar onClose={onClose} url={url} can={can} />;
+    const href = roleSlug === 'monitor' ? '/monitor/dashboard' : '/model/dashboard';
+    const permission = roleSlug === 'monitor' ? 'rooms.view_team' : 'rooms.view_own';
+    const items = [{ label: 'Dashboard', href, icon: FiGrid, permission }, ...(roleSlug === 'monitor' ? [{ label: 'Rooms', href: '/monitor/rooms', icon: FiGrid, permission: 'rooms.view_team' }, { label: 'Modelos', href: '/monitor/models', icon: FiUsers, permission: 'models.view_assigned' }] : [])];
+    return <aside className="flex h-full w-[224px] flex-col border-r border-[#1f222d] bg-[#090a10] px-4 py-5"><div className="px-3"><Wordmark /></div><nav className="sidebar-scroll mt-8 flex-1 overflow-y-auto"><p className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-[.2em] text-[#8990a1]">Operación</p>{items.filter((item) => can(item.permission)).map(({ label, href: itemHref, icon: Icon }) => <Link key={label} href={itemHref} onClick={onClose} className={`group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition ${isActive(label, url) ? 'bg-[#55166e] text-white shadow-[0_8px_22px_rgba(136,52,153,.22)]' : 'text-[#b9bac8] hover:bg-[#171522] hover:text-white'}`}><Icon size={17} strokeWidth={1.7} /><span>{label}</span>{isActive(label, url) && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-[#e6a0f2]" />}</Link>)}</nav><div className="mt-5 overflow-hidden rounded-lg border border-[#242632] bg-[#11121a]"><div className="relative h-32 overflow-hidden"><img src="/onboarding/modelo.webp" alt="" className="h-full w-full object-cover opacity-70" /><div className="absolute inset-0 bg-gradient-to-t from-[#11121a] via-[#351044]/25 to-transparent" /><p className="absolute bottom-3 left-3 right-3 font-editorial text-lg leading-none text-white">Talento real.<br />Historias más grandes.</p></div></div></aside>;
+}
+
+function GroupedPortalSidebar({ onClose, url, can }) {
+    const groups = [
+        { label: 'Operación', items: [{ label: 'Dashboard', href: '/monitor/dashboard', icon: FiGrid, permission: 'rooms.view_team' }, { label: 'Rooms', href: '/monitor/rooms', icon: FiGrid, permission: 'rooms.view_team' }] },
+        { label: 'Personas', items: [{ label: 'Modelos', href: '/monitor/models', icon: FiUsers, permission: 'models.view_assigned' }] },
+    ];
+    return <aside className="flex h-full w-[224px] flex-col border-r border-[#1f222d] bg-[#090a10] px-4 py-5"><div className="px-3"><Wordmark /></div><nav className="sidebar-scroll mt-8 flex-1 space-y-6 overflow-y-auto">{groups.map((group) => { const items = group.items.filter((item) => can(item.permission)); if (!items.length) return null; return <div key={group.label}><p className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-[.2em] text-[#8990a1]">{group.label}</p><div className="space-y-1">{items.map(({ label, href, icon: Icon }) => <Link key={label} href={href} onClick={onClose} className={`group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition ${isActive(label, url) ? 'bg-[#55166e] text-white shadow-[0_8px_22px_rgba(136,52,153,.22)]' : 'text-[#b9bac8] hover:bg-[#171522] hover:text-white'}`}><Icon size={17} strokeWidth={1.7} /><span>{label}</span>{isActive(label, url) && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-[#e6a0f2]" />}</Link>)}</div></div>; })}</nav><div className="mt-5 overflow-hidden rounded-lg border border-[#242632] bg-[#11121a]"><div className="relative h-32 overflow-hidden"><img src="/onboarding/modelo.webp" alt="" className="h-full w-full object-cover opacity-70" /><div className="absolute inset-0 bg-gradient-to-t from-[#11121a] via-[#351044]/25 to-transparent" /><p className="absolute bottom-3 left-3 right-3 font-editorial text-lg leading-none text-white">Talento real.<br />Historias más grandes.</p></div></div></aside>;
 }
 
 function ProfileMenu({ user, open, onToggle, menuRef }) {
@@ -88,6 +122,19 @@ export default function Layout({ children }) {
     const { can } = useAuthorization();
 
     useEffect(() => {
+        const headerActions = document.querySelector('header > div:last-child');
+        const shouldShow = user?.roles?.some((role) => ['model', 'monitor'].includes(role.slug)) && page.props.operationalAccess?.training_mode;
+        if (!headerActions || !shouldShow || headerActions.querySelector('[data-training-mode-badge]')) return;
+
+        const badge = document.createElement('span');
+        badge.dataset.trainingModeBadge = 'true';
+        badge.className = 'training-mode-badge hidden items-center gap-2 rounded-full border border-[#b8863b] bg-[#342515]/80 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[.12em] text-[#ffe1a1] sm:inline-flex';
+        badge.innerHTML = '<span class="training-mode-dot" aria-hidden="true"></span><span>Modo pruebas</span>';
+        headerActions.prepend(badge);
+        return () => badge.remove();
+    }, [page.props.operationalAccess?.training_mode, user?.roles]);
+
+    useEffect(() => {
         const interval = window.setInterval(() => setRelativeNow(Date.now()), 15000);
         return () => window.clearInterval(interval);
     }, []);
@@ -105,7 +152,12 @@ export default function Layout({ children }) {
         setNotifications(items.filter((item) => !item.read_at).length);
     }, [page.props.realtime?.notifications]);
 
-    useEffect(() => subscribeToRealtime((data) => {
+    useEffect(() => subscribeToRealtime((data, eventName) => {
+        const portalCandidateId = Number(page.props.auth?.user?.candidate_id || 0);
+        if (portalCandidateId && Number(data?.candidate_id || 0) === portalCandidateId && ['candidate.access_status_changed', 'candidate.status_changed'].includes(eventName)) {
+            router.reload({ preserveScroll: true, preserveState: false });
+            return;
+        }
         if (data?.counters) setCounters(data.counters);
         const notification = data?.notification;
         if (!notification) return;

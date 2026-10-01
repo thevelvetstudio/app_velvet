@@ -7,8 +7,9 @@ import * as Popover from '@radix-ui/react-popover';
 import 'react-day-picker/style.css';
 
 function dateFromValue(value) {
-    if (!value) return undefined;
-    const date = parseISO(value);
+    const rawValue = value?.target?.value ?? value;
+    if (!rawValue) return undefined;
+    const date = rawValue instanceof Date ? rawValue : parseISO(String(rawValue));
     return isValid(date) ? date : undefined;
 }
 

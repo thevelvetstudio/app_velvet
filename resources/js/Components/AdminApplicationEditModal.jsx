@@ -29,6 +29,11 @@ const englishLevels = [
     { value: 'C1', label: 'C1 · Avanzado' }, { value: 'C2', label: 'C2 · Dominio avanzado' },
     { value: 'NATIVE', label: 'Nativo' },
 ];
+const experienceYearsOptions = [
+    { value: '1', label: '1 año' },
+    { value: '2', label: '2 años' },
+    { value: '3_PLUS', label: '3 años o más' },
+];
 
 export default function AdminApplicationEditModal({ open, onClose, endpoint, person, candidateType, title }) {
     const form = useForm({
@@ -42,6 +47,7 @@ export default function AdminApplicationEditModal({ open, onClose, endpoint, per
         city: person.city || 'Manizales',
         birth_date: person.birth_date?.slice(0, 10) || '',
         experience: person.experience || '',
+        experience_years: person.experience_years || '',
         speaks_english: Boolean(person.speaks_english),
         english_level: person.english_level || '',
         motivation: person.motivation || '',
@@ -88,9 +94,10 @@ export default function AdminApplicationEditModal({ open, onClose, endpoint, per
                 <VelvetSelect label="Modalidad preferida" value={form.data.work_mode} onChange={set('work_mode')} options={workModeOptions} error={form.errors.work_mode} />
                 <VelvetSelect label="Disponibilidad horaria" value={form.data.availability} onChange={set('availability')} options={availabilityOptions} error={form.errors.availability} />
                 <VelvetSelect label="¿Cómo conociste Velvet?" value={form.data.source} onChange={set('source')} options={sourceOptions} error={form.errors.source} />
-                <label className="apply-field-label sm:col-span-2">Experiencia relevante<textarea value={form.data.experience} onChange={set('experience')} rows="5" className={`velvet-input ${form.errors.experience ? 'is-error' : ''}`} placeholder="Cuéntanos sobre tu experiencia relacionada con el perfil." />{form.errors.experience && <span className="apply-field-error">{form.errors.experience}</span>}</label>
+                <label className="apply-field-label sm:col-span-2">Experiencia relevante<textarea value={form.data.experience ?? ''} onChange={set('experience')} rows="5" className={`velvet-input ${form.errors.experience ? 'is-error' : ''}`} placeholder="Cuéntanos sobre tu experiencia relacionada con el perfil." />{form.errors.experience && <span className="apply-field-error">{form.errors.experience}</span>}<span className="mt-1 block text-[11px] text-[#777d8f]">La experiencia indicada debe ser demostrable.</span></label>
+                {form.data.candidate_type === 'MONITOR' && <VelvetSelect label="Años de experiencia" value={form.data.experience_years} onChange={set('experience_years')} options={experienceYearsOptions} error={form.errors.experience_years} />}
                 <div className="sm:col-span-2"><div className="flex min-h-12 items-center justify-between gap-4 rounded-lg border border-[#353544] bg-[#11121a] px-4 py-3"><span><strong className="block text-xs font-medium text-[#f1ecf4]">¿Habla inglés?</strong><small className="mt-1 block text-[11px] text-[#777d8f]">Indica si puede comunicarse en inglés.</small></span><Switch checked={form.data.speaks_english} onCheckedChange={(checked) => { form.setData('speaks_english', checked); if (!checked) form.setData('english_level', ''); }} aria-label="¿Habla inglés?" /></div>{form.data.speaks_english && <VelvetSelect label="Nivel de inglés" value={form.data.english_level} onChange={set('english_level')} options={englishLevels} error={form.errors.english_level} />}</div>
-                <label className="apply-field-label sm:col-span-2">¿Por qué quieres trabajar con Velvet?<textarea value={form.data.motivation} onChange={set('motivation')} rows="4" className={`velvet-input ${form.errors.motivation ? 'is-error' : ''}`} placeholder="Comparte tus motivaciones y expectativas." />{form.errors.motivation && <span className="apply-field-error">{form.errors.motivation}</span>}</label>
+                <label className="apply-field-label sm:col-span-2">¿Por qué quieres trabajar con Velvet?<textarea value={form.data.motivation ?? ''} onChange={set('motivation')} rows="4" className={`velvet-input ${form.errors.motivation ? 'is-error' : ''}`} placeholder="Comparte tus motivaciones y expectativas." />{form.errors.motivation && <span className="apply-field-error">{form.errors.motivation}</span>}</label>
             </div>
             <div className="mt-8 flex flex-col-reverse justify-end gap-3 border-t border-[#292d39] pt-5 sm:flex-row"><button type="button" onClick={onClose} className="rounded-lg border border-[#343044] px-5 py-3 text-sm text-[#c9c2cf] transition hover:border-[#6b5872] hover:text-white">Cancelar</button><button type="submit" disabled={form.processing} className="velvet-button gap-2">{form.processing ? 'Guardando…' : 'Guardar cambios'}<FiArrowRight size={16} /></button></div>
         </form>

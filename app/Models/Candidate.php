@@ -48,4 +48,9 @@ class Candidate extends Model
     {
         return $this->hasMany(Interview::class);
     }
+
+    public function contractAppointments()
+    {
+        return $this->hasMany(ContractAppointment::class);
+    }
 }

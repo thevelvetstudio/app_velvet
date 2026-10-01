@@ -2,6 +2,9 @@
 
 namespace App\Http\Requests\Auth;
 
+use App\Enums\CandidateStatus;
+use App\Models\Candidate;
+use App\Models\CandidateActivity;
 use Illuminate\Auth\Events\Lockout;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
@@ -42,7 +45,7 @@ class LoginRequest extends FormRequest
     {
         $this->ensureIsNotRateLimited();
 
-        if (! Auth::attempt($this->only('email', 'password'), $this->boolean('remember'))) {
+        if (! Auth::attempt(array_merge($this->only('email', 'password'), ['is_active' => true]), $this->boolean('remember'))) {
             RateLimiter::hit($this->throttleKey());
 
             throw ValidationException::withMessages([
@@ -51,6 +54,31 @@ class LoginRequest extends FormRequest
         }
 
         RateLimiter::clear($this->throttleKey());
+
+        $candidate = Candidate::query()->with('lead')
+            ->where('user_id', Auth::id())
+            ->where('status', CandidateStatus::ONBOARDING)
+            ->first();
+        if ($candidate) {
+            $candidate->update(['status' => CandidateStatus::INDUCTION]);
+            $activity = CandidateActivity::create([
+                'candidate_id' => $candidate->id,
+                'user_id' => Auth::id(),
+                'type' => 'first_login',
+                'description' => 'Primer ingreso al dashboard. El candidato pasó automáticamente a En inducción.',
+                'metadata' => ['user_id' => Auth::id()],
+            ]);
+            try {
+                app(\App\Services\RealtimePublisher::class)->publishLead($candidate->lead, 'candidate.status_changed', [
+                    'candidate_id' => $candidate->id,
+                    'status' => CandidateStatus::INDUCTION->value,
+                    'activity' => $activity->only(['id', 'description', 'created_at']),
+                    'notification' => ['title' => 'Primer ingreso registrado', 'description' => "{$candidate->lead->full_name} inició su inducción."],
+                ]);
+            } catch (\Throwable $exception) {
+                report($exception);
+            }
+        }
     }
 
     /**

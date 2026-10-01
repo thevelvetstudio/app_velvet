@@ -2,6 +2,46 @@
 @tailwind components;
 @tailwind utilities;
 
+/* File controls use the Velvet visual language while keeping native accessibility. */
+input[type='file'] {
+    min-height: 44px;
+    border: 1px solid #343044;
+    border-radius: .75rem;
+    background: linear-gradient(135deg, #1c1424, #11131c);
+    padding: .35rem .5rem;
+    color: #b9b3c3;
+    transition: border-color .2s ease, box-shadow .2s ease, background .2s ease;
+}
+
+input[type='file']:hover {
+    border-color: #8c3c9e;
+    background: linear-gradient(135deg, #24152e, #11131c);
+}
+
+input[type='file']:focus-visible {
+    outline: none;
+    border-color: #c22be8;
+    box-shadow: 0 0 0 3px rgba(194, 43, 232, .18);
+}
+
+input[type='file']::file-selector-button {
+    margin-right: .75rem;
+    cursor: pointer;
+    border: 0;
+    border-radius: .55rem;
+    background: #a92ad8;
+    padding: .55rem .9rem;
+    color: white;
+    font-size: .75rem;
+    font-weight: 600;
+    transition: background .2s ease, transform .2s ease;
+}
+
+input[type='file']::file-selector-button:hover {
+    background: #c04ce7;
+    transform: translateY(-1px);
+}
+
 .process-carousel-scroll {
     scrollbar-width: thin;
     scrollbar-color: #713080 transparent;
@@ -200,6 +240,40 @@ section.mt-6 > div.mt-6.grid.gap-5::-webkit-scrollbar-button:end:increment {
     box-shadow: 0 12px 30px rgba(0, 0, 0, .3);
 }
 
+@keyframes velvet-training-pulse {
+    0%, 100% { opacity: .55; transform: scale(.85); box-shadow: 0 0 0 0 rgba(255, 193, 92, .45); }
+    50% { opacity: 1; transform: scale(1); box-shadow: 0 0 0 5px rgba(255, 193, 92, 0); }
+}
+
+.training-mode-dot {
+    width: .45rem;
+    height: .45rem;
+    flex: 0 0 auto;
+    border-radius: 9999px;
+    background: #ffd078;
+    animation: velvet-training-pulse 1.8s ease-in-out infinite;
+}
+
+/* Modales operativos compactos y adaptables. */
+[class*="z-[80]"] > section {
+    width: min(100%, 28rem);
+    max-width: 28rem;
+    max-height: calc(100vh - 2rem);
+    overflow-y: auto;
+    padding: 1.25rem;
+}
+
+/* Los modales con información detallada necesitan más espacio de lectura. */
+[class*="z-[80]"] > section[role="dialog"] {
+    max-width: 32rem;
+}
+
+@media (min-width: 640px) {
+    [class*="z-[80]"] > section {
+        padding: 1.5rem;
+    }
+}
+
 @keyframes velvet-overlay-pulse {
     0%, 100% { transform: scale(.96); opacity: .78; filter: drop-shadow(0 0 10px rgba(194, 59, 234, .28)); }
     50% { transform: scale(1.04); opacity: 1; filter: drop-shadow(0 0 30px rgba(194, 59, 234, .7)); }
@@ -319,6 +393,8 @@ form > .mt-10 > button:disabled { display: none; }
 }
 
 @layer components {
+    input, select, textarea { box-sizing: border-box; min-width: 0; max-width: 100%; }
+    form label { min-width: 0; }
     .velvet-button { @apply inline-flex items-center justify-center rounded-lg bg-[#a92ad8] px-6 py-3 text-sm font-semibold tracking-wide text-white transition hover:bg-[#c23bea] focus:outline-none focus:ring-2 focus:ring-[#c23bea] focus:ring-offset-2 focus:ring-offset-[#090a10] disabled:cursor-not-allowed disabled:opacity-50; }
     .velvet-input { @apply mt-2 block w-full rounded-lg border-[#353544] bg-[#11121a] px-4 py-3 text-sm text-[#f7f1fb] shadow-sm placeholder:text-gray-500 focus:border-[#c23bea] focus:ring-[#c23bea]; }
     .velvet-date-trigger { @apply mt-2 flex h-12 w-full items-center justify-between rounded-lg border border-[#353544] bg-[#11121a] px-4 text-sm shadow-sm transition hover:border-[#8c42a4] focus:outline-none focus:ring-1 focus:ring-[#c23bea]; }
@@ -337,7 +413,7 @@ form > .mt-10 > button:disabled { display: none; }
 }
 
 .velvet-calendar-popover {
-    z-index: 50;
+    z-index: 100;
     width: 320px;
     border: 1px solid #353544;
     border-radius: .75rem;
@@ -348,7 +424,33 @@ form > .mt-10 > button:disabled { display: none; }
 }
 
 .velvet-time-trigger { @apply mt-2 flex h-12 w-full items-center justify-between rounded-lg border border-[#353544] bg-[#11121a] px-4 text-sm shadow-sm transition hover:border-[#8c42a4] focus:outline-none focus:ring-1 focus:ring-[#c23bea]; }
-.velvet-time-popover { z-index: 60; width: 220px; border: 1px solid #353544; border-radius: .75rem; background: #11121a; padding: .7rem; color: #f7f1fb; box-shadow: 0 18px 50px rgba(0, 0, 0, .5); }
+.velvet-time-popover { z-index: 100; width: 220px; border: 1px solid #353544; border-radius: .75rem; background: #11121a; padding: .7rem; color: #f7f1fb; box-shadow: 0 18px 50px rgba(0, 0, 0, .5); }
+.velvet-input, .velvet-date-trigger, .velvet-time-trigger { box-sizing: border-box; min-width: 0; max-width: 100%; }
+.velvet-input { overflow: hidden; text-overflow: ellipsis; }
+.velvet-time-trigger > span, .velvet-date-trigger > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.velvet-datetime-field, .velvet-datetime-field label, .velvet-datetime-field__grid { min-width: 0; }
+.velvet-datetime-field__zone { min-width: 0; max-width: 55%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fixed.inset-0 > section { box-sizing: border-box; min-width: 0; max-width: calc(100vw - 2rem); }
+.fixed.inset-0 > section form, .fixed.inset-0 > section form > label { min-width: 0; }
+
+.velvet-datetime-field { @apply min-w-0 rounded-2xl border border-[#302a3c] bg-gradient-to-br from-[#171421] to-[#101119] p-4 transition; box-shadow: inset 0 1px 0 rgba(255,255,255,.025); }
+.velvet-datetime-field:focus-within { @apply border-[#a92ad8]; box-shadow: 0 0 0 3px rgba(169,42,216,.1), inset 0 1px 0 rgba(255,255,255,.04); }
+.velvet-datetime-field__legend { @apply flex w-full items-center gap-2 text-sm font-semibold text-[#f7f1fb]; }
+.velvet-datetime-field__index { @apply grid h-6 w-6 place-items-center rounded-md bg-[#3c1749] text-[9px] font-bold tracking-[.08em] text-[#e4a2f2]; }
+.velvet-datetime-field__zone { @apply ml-auto rounded-full border border-[#383044] px-2 py-1 text-[9px] font-normal tracking-[.04em] text-[#878091]; }
+.velvet-datetime-field__hint { @apply mt-1 text-[11px] text-[#858090]; }
+.velvet-datetime-field__grid { @apply mt-3 grid gap-3 sm:grid-cols-2; }
+.velvet-datetime-field > span { @apply mt-2 block text-xs; }
+
+@media (max-width: 639px) {
+    .velvet-datetime-field__grid { grid-template-columns: minmax(0, 1fr); }
+    .velvet-datetime-field__legend { gap: .45rem; }
+    .velvet-datetime-field__zone { font-size: .55rem; }
+    .fixed.inset-0 { padding: .75rem; }
+    .fixed.inset-0 > section { max-height: calc(100dvh - 1.5rem); overflow-y: auto; padding: 1rem; }
+    .fixed.inset-0 > section form > div:last-child { flex-wrap: wrap; }
+    .fixed.inset-0 > section form > div:last-child > button { flex: 1 1 9rem; min-width: 0; }
+}
 
 .interview-slot-dropdown { background: #11121a; color: #f7f1fb; isolation: isolate; }
 .interview-slot-search-wrap { background: #151522; }
@@ -1401,4 +1503,63 @@ main > header {
 
 .interview-slots-scroll::-webkit-scrollbar-thumb:hover {
     background: #a55ab7;
+}
+
+/* Thin scrollbar for the contracting slot list. */
+div[class*="max-h-[450px]"] {
+    scrollbar-width: thin;
+    scrollbar-color: #70477b transparent;
+    scrollbar-gutter: stable;
+}
+
+div[class*="max-h-[450px]"]::-webkit-scrollbar {
+    width: 5px;
+}
+
+div[class*="max-h-[450px]"]::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+div[class*="max-h-[450px]"]::-webkit-scrollbar-thumb {
+    border-radius: 999px;
+    background: #70477b;
+}
+
+div[class*="max-h-[450px]"]::-webkit-scrollbar-thumb:hover {
+    background: #a55ab7;
+}
+
+div[class*="max-h-[450px]"]::-webkit-scrollbar-button {
+    display: none;
+    width: 0;
+}
+
+/* Visually separate signed documents from scheduled contracting appointments. */
+section.mt-6.rounded-xl.border:has(> form + div.mt-5.space-y-2) > div:first-child h2 {
+    font-size: 0;
+}
+
+section.mt-6.rounded-xl.border:has(> form + div.mt-5.space-y-2) > div:first-child h2::after {
+    content: 'Documentos';
+    font-size: .875rem;
+}
+
+section.mt-6.rounded-xl.border > form + div.mt-5.space-y-2 {
+    margin-top: 2rem;
+    border-top: 1px solid #292d39;
+    padding-top: 1.5rem;
+}
+
+section.mt-6.rounded-xl.border > form + div.mt-5.space-y-2::before {
+    content: 'Contrataciones programadas';
+    display: block;
+    margin-bottom: 1rem;
+    color: #d5a1e1;
+    font-size: .75rem;
+    font-weight: 600;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+}
+.admission-active > div:nth-child(3) {
+    display: none;
 }

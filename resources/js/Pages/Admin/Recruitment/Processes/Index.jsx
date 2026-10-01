@@ -2,7 +2,7 @@ import { Head, Link, router } from '@inertiajs/react';
 import { FiArrowRight, FiCheckCircle, FiClock, FiFileText, FiSearch, FiUser } from 'react-icons/fi';
 import Layout from '../Layout';
 
-const steps = [['NEW', 'Nuevo'], ['CONTACTED', 'Contactado'], ['QUALIFIED', 'Calificado'], ['PREQUALIFIED', 'Precalificado'], ['INTERVIEW', 'Entrevista'], ['EVALUATION', 'Evaluaci\u00f3n'], ['ADMITTED', 'Admitido'], ['WAITING', 'En espera'], ['ONBOARDING', 'Onboarding'], ['CONTRACTING', 'Contrataci\u00f3n'], ['INDUCTION', 'Inducci\u00f3n'], ['READY_TO_ACTIVATE', 'Listo para activar'], ['ACTIVE', 'Activo'], ['WITHDRAWN', 'Retirado'], ['DISCARDED', 'Descartado']];
+const steps = [['NEW', 'Nuevo'], ['CONTACTED', 'Contactado'], ['QUALIFIED', 'Calificado'], ['PREQUALIFIED', 'Precalificado'], ['INTERVIEW', 'Entrevista'], ['EVALUATION', 'Evaluaci\u00f3n'], ['ADMITTED', 'Admitido'], ['WAITING', 'En espera'], ['CONTRACTING', 'Contrataci\u00f3n'], ['ONBOARDING', 'Onboarding'], ['INDUCTION', 'Inducci\u00f3n'], ['READY_TO_ACTIVATE', 'Listo para activar'], ['ACTIVE', 'Activo'], ['WITHDRAWN', 'Retirado'], ['DISCARDED', 'Descartado']];
 const stageIndex = Object.fromEntries(steps.map(([value], index) => [value, index]));
 const stageColors = { DISCARDED: 'border-[#7d3144] bg-[#321622] text-[#ffb1bd]', WITHDRAWN: 'border-[#51445a] bg-[#201b29] text-[#c8bfd0]', INTERVIEW: 'border-[#80508c] bg-[#321344] text-[#e7b2f1]', PREQUALIFIED: 'border-[#5367a2] bg-[#1c2945] text-[#b9cbff]', ACTIVE: 'border-[#2d8669] bg-[#12372e] text-[#9af2cb]' };
 
